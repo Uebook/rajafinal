@@ -17,7 +17,7 @@ def find_project_root():
         if (current / ".env").exists() or (current / "app").exists():
             return current
         current = current.parent
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).resolve().parent.parent.parent
 
 PROJECT_ROOT = find_project_root()
 if str(PROJECT_ROOT) not in sys.path:

@@ -1,0 +1,54 @@
+{
+  "wholesale": {
+    "Electronics": {
+      "Mobile & Accessories": ["Charger", "Earphone/Headphone", "Smart watch", "Power Bank"],
+      "Computer Accessories": ["Keyboard", "Mouse", "Storage device"],
+      "Home Electronic": ["Cooler", "Fan", "Heater", "Hair dryer", "Trimmer"]
+    },
+    "Clothes": {
+      "Men": [],
+      "Women": [],
+      "Children": []
+    },
+    "Grocery": {
+      "Daily Essential": ["Atta", "Rice", "Pulse", "Oil", "Ghee", "Salt"],
+      "Dry fruits": ["Almonds", "Cashews", "Raisin"],
+      "Spices Whole": ["Turmeric", "Coriander", "Red chilli"],
+      "Seeds": ["Pumpkin seed", "Sunflower seed", "Chia seeds"],
+      "Pooja item": ["Havan", "Gangajal"],
+      "Herbs": ["Shikakai", "Paneer flower (Paneer fool)"]
+    }
+  },
+  "retail": {
+    "Electronics": {
+      "Mobile & Accessories": ["Smart Phone", "Chargers", "Earphones/Headphone", "Smart Watches", "Power bank"],
+      "Computer & Accessories": ["Laptop", "Keyboard", "Mouse", "Printers", "Storage device", "SSD/Hard disk"],
+      "Home Electronics": ["TV", "AC", "Refrigerator", "Washing machine", "fan"]
+    },
+    "Clothing & fashion": {
+      "Men": ["Tshirt", "Shirt", "Jeans", "Trousers", "Ethenic Wear", "footwear"],
+      "Women": ["Sarees", "Kurti", "Suits", "Tops", "Dresses", "footwear"],
+      "Kids": ["Boys Wear", "Girls wear", "School wears"],
+      "Fashion Essential": ["Watches", "Belt", "Bag", "Sunglasses", "Undergarment"]
+    },
+    "Grocery": {
+      "Daily Essential": ["Atta", "Rice", "Pulses", "Oil", "Sugar", "Salt"],
+      "Dry fruits": ["Almond", "Cashews", "Raisins", "Pistachios", "Dates", "Dry Dates"],
+      "Spices": ["Garam Masala", "Turmeric", "Red chilli", "Star Anise", "Cloves", "Black Paper", "Cinnamon", "Green Cardeman"],
+      "Snacks & Beverages": ["Namkeen", "Bisket", "Soft drink", "Rasgalla"]
+    }
+  },
+  "grocery_catalog": {
+    "Worship item (पूजा का सामान)": ["Lotus Seeds Raw (कमलगट्टा)", "Havan Masala (हवन मसाला)"],
+    "Seeds (बीज)": ["Watermelon Seeds (तरबूज के बीज)", "Sunflower Seeds (सूरजमुखी के बीज)", "Chia Seeds (चिया के बीज)", "Flax Seeds (अलसी के बीज)", "Pumpkin Seeds (कद्दू के बीज)"],
+    "Herbs & Ayurvedic (जड़ी-बूटी एवं आयुर्वेदिक)": ["Dried Amla (सूखा आंवला)", "Bach Wood (बछ की लकड़ी)", "Licorice Root (मुलेठी)", "Shikakai (शिकाकाई)", "Soapnut (रीठा)", "Alkanet Root (रतनजोत)", "Paneer Flower (पनीर फूल)"],
+    "Dairy Product (डेयरी उत्पाद)": ["fresh Cream (ताजा क्रीम)", "Butter (मक्खन)", "Curd (दही)", "Sweet Corn (मीठा मक्का)", "Soya Chap (सोया चाप)", "Paneer (पनीर)", "Green Peas (मटर)"],
+    "Oil & Ghee (तेल व घी)": ["Refined 500ml (रिफाइंड 500ml)", "Refined 1 ltr (रिफाइंड 1ltr)", "Refined 2 ltr (रिफाइंड 2 ltr)", "Refined 5ltr (रिफाइंड 5ltr )", "Refined 15 Tin (रिफाइंड 15 ltr टीन)", "Refined 15ltr Jar (रिफाइंड 15 ltr जार)", "Kachi ghani 500ml (कच्ची घानी 500ml)", "Kachi ghani 1ltr (कच्ची घानी 1 ltr)", "Kachi ghani 2lt (कच्ची घानी 2ltr)", "Kachi ghani 5ltr (कच्ची घानी 5ltr)", "Kachi ghani 15ltr (कच्ची घानी 15ltr)", "Ghee Desi 250ml (देशी घी 250 ml)", "Ghee Desi 500ml (देशी घी 500 ml)", "Ghee Desi 1 ltr (देशी घी 1 ltr)", "Ghee Dalda (डालडा घी)"],
+    "Whole spices and other grocery items (खड़े मसाले और अन्य किराना सामान)": [
+      "Carom Seeds (अजवाइन)", "Black Cardamom (बड़ी इलायची / इलायची बड़ी)", "Star Anise (चक्रफूल)", "Coriander Seeds (धनिया खड़ी / धनिया साबुत)", "Turmeric Fingers (हल्दी खड़ी)", "Mace (जावित्री)", "Nutmeg (जायफल)", "Cumin Seeds Kesari (जीरा केसरी)", "Cumin Seeds Kohinoor (जीरा कोहिनूर)", "Cubeb Pepper (कबाब चीनी)", "Black Pepper (काली मिर्च)", "Nigella Seeds (कलौंजी (मंगरैल))", "Dried Fenugreek (कसूरी मेथी)", "Red Chilli (लाल मिर्च)", "Cloves (लौंग)", "Fenugreek Seeds (मेथी दाना)", "White Pepper (सफेद मिर्च)", "Shatavari (सतावर)", "Betel Nut Jam (सुपारी जाम)", "Betel Nut Jini (सुपारी जीनी)", "Edible Gond (गोंद)", "Dried Gond (गोंद कतली)", "Tapioca Pearls (साबूदाना)", "White Turmeric (हल्दी आमा)", "Garden Cress Seeds (चामसूर)", "Green Cardamom (इलायची छोटी)", "Poppy Seeds (खसखस / पोस्ता दाना)", "Cinnamon (दालचीनी)", "Salt (नमक)", "Licorice (मुलेठी)", "Asafoetida 5g (हींग)", "Asafoetida 20g (हींग)", "Asafoetida 50g (हींग)", "Asafoetida 100g (हींग)", "White Sesame Seeds (सफेद तिल)", "Kashmiri Red Chilli (कश्मीरी लाल मिर्च)", "Tamarind (इमली)", "Rock Salt (सेंधा नमक)", "Vanilla Essence (वैनिला एसेंस)", "Baking Powder (बेकिंग पाउडर)", "Baking Soda (बेकिंग सोडा)", "Cocoa Powder (कोको पाउडर)", "Chirayta (चिरायता)", "Camphor (कपूर)", "Caraway Seeds (शाही जीरा)", "Black Sesame Seeds (काला तिल)", "Frankincense (लोबान)", "Alum (फिटकरी)", "Rock sugar (मिश्री)", "Thread Sugar (मिश्री धागा)", "Fennel Seeds Gold (सौंफ गोल्ड)", "Fennel Seeds Tulsi (सौंफ तुलसी)", "Bay Leaf (तेज पत्ता)", "Dry Ginger (सोंठ)", "Almondette (चिरौंजी)", "Peanuts (मूंगफली)", "Arshi (अरशी)"
+    ],
+    "Dry fruits (सूखे मेवे)": [
+      "Dry Apricot (खुबानी)", "Dry Dates Yellow (छुहारा पीला)", "Dry Date Black (छुहारा काला)", "Dates (खजूर)", "Raisins (किशमिश)", "Black Raisins (मुनक्का)", "Almonds fresh (बादाम फ्रेश)", "Almond Indi (बादाम इण्डी)", "Grated dry Coconut (गरी लच्छा)", "Coconut Powder (गरी बुरादा)", "fox Nuts 100g (मखाना)", "fox Nuts 250g (मखाना)", "Cashew nut 2pcs (काजू 2 टुकड़ा)", "Cashew nut 3pcs (काजू 3 टुकड़ा)", "Cashew 180 Lot (काजू 180 लार)", "Cashew 210 Lot (काजू 210 बार)", "Cashew 320 Lot (काजू 320 लाट)", "Minced Cashew (काजू नोका)", "Trail Mix (सूखे मेवे)", "Whole walnut (अखरोट साबुत)", "Walnut kernels (अखरोट गिरी)", "Pistachio (पिस्ता)", "Green Pistachio (हरा पिस्ता)", "Tutti frutti (टूटी फ्रूटी)", "Dry Cherry"
+    ]
+  }
+}
