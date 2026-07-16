@@ -12,7 +12,7 @@ import { logout, setTokens } from '../store/slices/authSlice';
 const LOCAL_API_HOST = Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://localhost:8000';
 const BASE_URL = __DEV__
   ? `${LOCAL_API_HOST}/api/v1`
-  : 'https://raja1-glbd.onrender.com/api/v1';
+  : 'https://raja1-hnmg.onrender.com/api/v1';
 // const BASE_URL = "http://192.168.1.38:8000/api/v1"
 
 export const api = axios.create({
