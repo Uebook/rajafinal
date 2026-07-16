@@ -7,7 +7,7 @@
 
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE = 'https://raja1-hnmg.onrender.com/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -34,7 +34,7 @@ api.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem('amb_refresh_token');
         if (!refreshToken) throw new Error('No refresh token');
-        
+
         const { data } = await axios.post(`${API_BASE}/auth/token/refresh`, {
           refresh_token: refreshToken,
         });
