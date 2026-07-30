@@ -25,17 +25,30 @@ const menuItems = [
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
-const Sidebar = ({ darkMode, toggleDarkMode }) => {
+const Sidebar = ({ darkMode, toggleDarkMode, sidebarOpen, setSidebarOpen }) => {
   const { logout, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
   return (
-    <nav className="sidebar">
-      <div className="sidebar-brand">
-        <div className="brand-logo"><Zap size={20} /></div>
-        <span className="brand-name">Supply Setu</span>
+    <nav className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <div className="sidebar-brand" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="brand-logo"><Zap size={20} /></div>
+          <span className="brand-name">Supply Setu</span>
+        </div>
+        <button 
+          className="sidebar-close-btn"
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close Sidebar"
+          style={{
+            background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer',
+            padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}
+        >
+          <X size={20} />
+        </button>
       </div>
 
       <ul className="sidebar-menu">
@@ -44,7 +57,11 @@ const Sidebar = ({ darkMode, toggleDarkMode }) => {
           const Icon = item.icon;
           return (
             <li key={item.path}>
-              <NavLink to={item.path} className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}>
+              <NavLink 
+                to={item.path} 
+                className={({ isActive }) => `sidebar-item ${isActive ? 'active' : ''}`}
+                onClick={() => setSidebarOpen(false)}
+              >
                 <Icon size={18} />
                 {item.label}
               </NavLink>

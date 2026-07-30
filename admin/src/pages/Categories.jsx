@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Plus, Search, Edit, Trash2, X } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, X, Download } from 'lucide-react';
 
 const Categories = () => {
   const [categories, setCategories] = useState([]);
@@ -142,6 +142,32 @@ const Categories = () => {
   const totalPages = Math.ceil(orderedCategories.length / itemsPerPage);
   const paginatedCategories = orderedCategories.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  const exportToCSV = () => {
+    const headers = ['Category Name', 'Type', 'Description', 'Visible to Vendor', 'Visible to Retailer', 'Status'];
+    const rows = orderedCategories.map(c => [
+      c.name,
+      c.parent_id ? 'Subcategory' : 'Parent',
+      c.description || '—',
+      c.visible_to_vendor ? 'Yes' : 'No',
+      c.visible_to_retailer ? 'Yes' : 'No',
+      c.is_active ? 'Active' : 'Inactive'
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Categories_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (loading) return <div className="loading-center"><div className="spinner" /></div>;
 
   return (
@@ -151,9 +177,18 @@ const Categories = () => {
           <h1>Categories</h1>
           <p>Manage product categories and catalog visibility</p>
         </div>
-        <button id="add-category-btn" className="btn btn-primary" onClick={openCreate}>
-          <Plus size={16} /> Add Category
-        </button>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <button
+            onClick={exportToCSV}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+          >
+            <Download size={16} /> Export CSV
+          </button>
+          <button id="add-category-btn" className="btn btn-primary" onClick={openCreate}>
+            <Plus size={16} /> Add Category
+          </button>
+        </div>
       </div>
 
       <div className="table-container">

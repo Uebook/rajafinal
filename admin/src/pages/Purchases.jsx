@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { 
   ShoppingBag, Plus, Search, Eye, Filter, Calendar, 
-  Truck, DollarSign, Package, CheckCircle, Clock, AlertCircle, UserPlus, X
+  Truck, DollarSign, Package, CheckCircle, Clock, AlertCircle, UserPlus, X, Download
 } from 'lucide-react';
 
 const Purchases = () => {
@@ -195,6 +195,32 @@ const Purchases = () => {
   const totalPages = Math.ceil(filteredPurchases.length / itemsPerPage);
   const paginatedPurchases = filteredPurchases.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  const exportToCSV = () => {
+    const headers = ['Purchase Invoice #', 'Supplier Name', 'Invoice Date', 'Total Amount', 'Paid Amount', 'Status'];
+    const rows = filteredPurchases.map(p => [
+      p.purchaseNumber,
+      p.supplierName,
+      new Date(p.invoiceDate).toLocaleDateString(),
+      p.totalAmount,
+      p.paidAmount,
+      p.paymentStatus
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Purchase_History_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div>
       {/* Top Header */}
@@ -203,7 +229,14 @@ const Purchases = () => {
           <h1>Purchase History & Supplier Stock</h1>
           <p>Record supplier purchases, track historical purchase rates, and auto-increment product stock.</p>
         </div>
-        <div className="header-actions" style={{ display: 'flex', gap: 12 }}>
+        <div className="header-actions" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <button
+            onClick={exportToCSV}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+          >
+            <Download size={16} /> Export CSV
+          </button>
           <button
             onClick={() => setShowNewSupplierModal(true)}
             className="btn btn-secondary"

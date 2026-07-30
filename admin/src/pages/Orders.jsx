@@ -235,6 +235,35 @@ const Orders = () => {
     }
   };
 
+  const handleExportGeneral = () => {
+    const headers = ['Order #', 'Buyer Name', 'Business', 'Status', 'Items Qty', 'Subtotal (INR)', 'GST (INR)', 'Total (INR)', 'Date'];
+    const rows = filteredOrders.map(o => [
+      o.order_number,
+      o.buyer_name || '—',
+      o.buyer_business || '—',
+      o.status,
+      o.items?.length || 0,
+      ((o.subtotal || 0) / 100).toFixed(2),
+      ((o.gst_amount || 0) / 100).toFixed(2),
+      ((o.grand_total || 0) / 100).toFixed(2),
+      new Date(o.created_at).toLocaleDateString()
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Orders_History_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const clearFilters = () => {
     setStatusFilter('');
     setDateFrom('');
@@ -262,7 +291,10 @@ const Orders = () => {
       {/* Header */}
       <div className="view-header">
         <div className="view-title-wrap"><h1>Orders</h1><p>Track and manage all platform orders</p></div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" onClick={handleExportGeneral}>
+            Export CSV
+          </button>
           <button className="btn btn-secondary" onClick={handleExportTally}>
             Export Tally CSV
           </button>

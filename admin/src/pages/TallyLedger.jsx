@@ -58,6 +58,35 @@ const TallyLedger = () => {
   const totalPages = Math.ceil(filteredVouchers.length / itemsPerPage);
   const paginatedVouchers = filteredVouchers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  const exportToCSV = () => {
+    const headers = ['Date & Time', 'Voucher Type', 'Debit Account', 'Credit Account', 'Supplier/Buyer', 'Type', 'Particulars', 'Debit Amount', 'Credit Amount'];
+    const rows = filteredVouchers.map(v => [
+      new Date(v.createdAt).toLocaleString(),
+      v.voucherType || 'GENERAL',
+      v.debitAccount || '—',
+      v.creditAccount || '—',
+      v.partyName || '—',
+      v.partyType || '—',
+      v.description || '',
+      v.entryType === 'DEBIT' ? v.amount : 0,
+      v.entryType === 'CREDIT' ? v.amount : 0
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Tally_Daybook_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div>
       {/* Header */}
@@ -66,13 +95,22 @@ const TallyLedger = () => {
           <h1>Tally Double-Entry Daybook & Accounting</h1>
           <p>Real-time voucher balances for Purchase Payables (Suppliers) and Sales Receivables (Retailers).</p>
         </div>
-        <button
-          onClick={fetchDaybook}
-          className="btn btn-secondary"
-          style={{ display: 'flex', alignItems: 'center', gap: 8 }}
-        >
-          <RefreshCw size={16} /> Refresh Daybook
-        </button>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <button
+            onClick={exportToCSV}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+          >
+            <Download size={16} /> Export Daybook CSV
+          </button>
+          <button
+            onClick={fetchDaybook}
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+          >
+            <RefreshCw size={16} /> Refresh Daybook
+          </button>
+        </div>
       </div>
 
       {/* Stats Summary Cards */}

@@ -462,11 +462,112 @@ body {
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 
-/* Responsive */
+/* Responsive Layout Adjustments */
+.menu-toggle-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 4px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+}
+
+.menu-toggle-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+.sidebar-close-btn {
+  display: none;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 998;
+}
+
 @media (max-width: 768px) {
-  .sidebar { display: none; }
-  .main-workspace { margin-left: 0; }
-  .top-header { left: 0; }
+  .menu-toggle-btn {
+    display: flex;
+  }
+  
+  .sidebar-close-btn {
+    display: flex;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 260px;
+    z-index: 1000;
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-lg);
+    transition: transform var(--transition-normal);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .main-workspace {
+    margin-left: 0 !important;
+    padding: 16px !important;
+    padding-top: 86px !important;
+  }
+
+  .top-header {
+    left: 0 !important;
+    padding: 0 16px !important;
+  }
+
+  /* Stacked layouts for grids on mobile */
+  .kpi-grid, .form-grid-3, .form-grid-2, .dashboard-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .view-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .table-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .table-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .table-search {
+    width: 100% !important;
+  }
+  
+  /* Modal responsiveness updates */
+  .modal-content {
+    width: 95vw !important;
+    margin: 10px !important;
+    max-height: 90vh !important;
+  }
 }
 
 /* Loading Spinner */
