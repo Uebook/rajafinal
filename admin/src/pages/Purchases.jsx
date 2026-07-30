@@ -160,122 +160,127 @@ const Purchases = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div>
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <ShoppingBag className="w-7 h-7 text-indigo-600" />
-            Purchase History & Supplier Stock
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Record supplier purchases, track historical purchase rates, and auto-increment product stock.
-          </p>
+      <div className="view-header">
+        <div className="view-title-wrap">
+          <h1>Purchase History & Supplier Stock</h1>
+          <p>Record supplier purchases, track historical purchase rates, and auto-increment product stock.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="header-actions" style={{ display: 'flex', gap: 12 }}>
           <button
             onClick={() => setShowNewSupplierModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition"
+            className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: 8 }}
           >
-            <UserPlus className="w-4 h-4" /> Add Supplier
+            <UserPlus size={16} /> Add Supplier
           </button>
           <button
             onClick={() => setShowNewPurchaseModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm transition"
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: 8 }}
           >
-            <Plus className="w-4 h-4" /> Record New Purchase
+            <Plus size={16} /> Record New Purchase
           </button>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-wrap items-center gap-4">
-        <div className="flex-1 min-w-[240px] relative">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-          <input
-            type="text"
-            placeholder="Search by Purchase # or Supplier Name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-          />
-        </div>
+      <div className="table-container" style={{ marginBottom: 20 }}>
+        <div className="table-toolbar">
+          <div className="table-filters" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <select
+              value={selectedSupplierFilter}
+              onChange={(e) => setSelectedSupplierFilter(e.target.value)}
+              className="select-filter"
+            >
+              <option value="">All Suppliers</option>
+              {suppliers.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
 
-        <select
-          value={selectedSupplierFilter}
-          onChange={(e) => setSelectedSupplierFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-        >
-          <option value="">All Suppliers</option>
-          {suppliers.map(s => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Date:</span>
+              <input
+                type="date"
+                value={startDateFilter}
+                onChange={(e) => setStartDateFilter(e.target.value)}
+                className="form-input"
+                style={{ width: 'auto', padding: '6px 10px', fontSize: '0.8rem', height: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}
+              />
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>to</span>
+              <input
+                type="date"
+                value={endDateFilter}
+                onChange={(e) => setEndDateFilter(e.target.value)}
+                className="form-input"
+                style={{ width: 'auto', padding: '6px 10px', fontSize: '0.8rem', height: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}
+              />
+            </div>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500 font-medium">Date:</span>
-          <input
-            type="date"
-            value={startDateFilter}
-            onChange={(e) => setStartDateFilter(e.target.value)}
-            className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 outline-none"
-          />
-          <span className="text-xs text-gray-400">to</span>
-          <input
-            type="date"
-            value={endDateFilter}
-            onChange={(e) => setEndDateFilter(e.target.value)}
-            className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 outline-none"
-          />
+          <div className="table-search">
+            <Search size={14} color="var(--text-muted)" />
+            <input
+              type="text"
+              placeholder="Search by Invoice # or Supplier..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
       {/* Purchase List Table */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="table-container">
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading purchase history...</div>
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Loading purchase history...</div>
         ) : filteredPurchases.length === 0 ? (
-          <div className="p-12 text-center text-gray-400">
-            <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            No purchase entries found. Click "Record New Purchase" to add one.
+          <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
+            <Package size={48} style={{ marginBottom: 12, opacity: 0.5 }} />
+            <p>No purchase entries found. Click "Record New Purchase" to add one.</p>
           </div>
         ) : (
-          <table className="w-full text-left border-collapse">
+          <table className="custom-table">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                <th className="py-3 px-4">Purchase Invoice #</th>
-                <th className="py-3 px-4">Supplier Name</th>
-                <th className="py-3 px-4">Invoice Date</th>
-                <th className="py-3 px-4">Total Amount</th>
-                <th className="py-3 px-4">Paid</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Action</th>
+              <tr>
+                <th>Purchase Invoice #</th>
+                <th>Supplier Name</th>
+                <th>Invoice Date</th>
+                <th>Total Amount</th>
+                <th>Paid</th>
+                <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 text-sm">
+            <tbody>
               {filteredPurchases.map((p) => (
-                <tr key={p.id} className="hover:bg-gray-50/80 transition">
-                  <td className="py-3 px-4 font-semibold text-indigo-600">{p.purchaseNumber}</td>
-                  <td className="py-3 px-4 font-medium text-gray-900">{p.supplierName}</td>
-                  <td className="py-3 px-4 text-gray-500">{new Date(p.invoiceDate).toLocaleDateString()}</td>
-                  <td className="py-3 px-4 font-bold text-gray-900">₹{p.totalAmount.toLocaleString()}</td>
-                  <td className="py-3 px-4 text-emerald-600 font-medium">₹{p.paidAmount.toLocaleString()}</td>
-                  <td className="py-3 px-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                      p.paymentStatus === 'PAID' ? 'bg-emerald-100 text-emerald-800' :
-                      p.paymentStatus === 'PARTIAL' ? 'bg-amber-100 text-amber-800' :
-                      'bg-rose-100 text-rose-800'
-                    }`}>
+                <tr key={p.id}>
+                  <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{p.purchaseNumber}</td>
+                  <td>{p.supplierName}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>{new Date(p.invoiceDate).toLocaleDateString()}</td>
+                  <td style={{ fontWeight: 700 }}>₹{p.totalAmount.toLocaleString()}</td>
+                  <td style={{ color: 'var(--secondary)', fontWeight: 600 }}>₹{p.paidAmount.toLocaleString()}</td>
+                  <td>
+                    <span style={{
+                      fontSize: 10,
+                      backgroundColor: p.paymentStatus === 'PAID' ? 'var(--secondary-light)' : p.paymentStatus === 'PARTIAL' ? 'var(--warning-light)' : 'var(--danger-light)',
+                      color: p.paymentStatus === 'PAID' ? 'var(--secondary)' : p.paymentStatus === 'PARTIAL' ? 'var(--primary)' : 'var(--danger)',
+                      padding: '4px 8px',
+                      borderRadius: 4,
+                      fontWeight: 'bold'
+                    }}>
                       {p.paymentStatus}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-right">
+                  <td style={{ textAlign: 'right' }}>
                     <button
                       onClick={() => handleViewDetails(p.id)}
-                      className="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                      className="btn-icon"
                       title="View Details"
                     >
-                      <Eye className="w-4 h-4" />
+                      <Eye size={16} />
                     </button>
                   </td>
                 </tr>
@@ -287,78 +292,89 @@ const Purchases = () => {
 
       {/* Modal: New Supplier */}
       {showNewSupplierModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative">
-            <button 
-              onClick={() => setShowNewSupplierModal(false)}
-              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Add New Supplier</h3>
-            <form onSubmit={handleCreateSupplier} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Company / Supplier Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={supplierForm.name}
-                  onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="e.g. ABC Traders Pvt Ltd"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Contact Person</label>
+        <div className="modal-overlay" onClick={() => setShowNewSupplierModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <h2>Add New Supplier</h2>
+              <button className="btn-icon" onClick={() => setShowNewSupplierModal(false)}>
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateSupplier} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">Company / Supplier Name *</label>
                   <input
                     type="text"
-                    value={supplierForm.contactPerson}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, contactPerson: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none"
+                    required
+                    value={supplierForm.name}
+                    onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })}
+                    className="form-input"
+                    placeholder="e.g. ABC Traders Pvt Ltd"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Mobile Number</label>
-                  <input
-                    type="text"
-                    value={supplierForm.mobile}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, mobile: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none"
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Contact Person</label>
+                    <input
+                      type="text"
+                      value={supplierForm.contactPerson}
+                      onChange={(e) => setSupplierForm({ ...supplierForm, contactPerson: e.target.value })}
+                      className="form-input"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Mobile Number</label>
+                    <input
+                      type="text"
+                      value={supplierForm.mobile}
+                      onChange={(e) => setSupplierForm({ ...supplierForm, mobile: e.target.value })}
+                      className="form-input"
+                    />
+                  </div>
+                </div>
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">GSTIN Number</label>
+                    <input
+                      type="text"
+                      value={supplierForm.gstin}
+                      onChange={(e) => setSupplierForm({ ...supplierForm, gstin: e.target.value })}
+                      className="form-input"
+                      style={{ textTransform: 'uppercase' }}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Email</label>
+                    <input
+                      type="email"
+                      value={supplierForm.email}
+                      onChange={(e) => setSupplierForm({ ...supplierForm, email: e.target.value })}
+                      className="form-input"
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Address</label>
+                  <textarea
+                    value={supplierForm.address}
+                    onChange={(e) => setSupplierForm({ ...supplierForm, address: e.target.value })}
+                    className="form-textarea"
+                    rows={2}
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">GSTIN Number</label>
-                  <input
-                    type="text"
-                    value={supplierForm.gstin}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, gstin: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none uppercase"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={supplierForm.email}
-                    onChange={(e) => setSupplierForm({ ...supplierForm, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none"
-                  />
-                </div>
-              </div>
-              <div className="pt-2 flex justify-end gap-3">
+              <div className="modal-footer">
                 <button
                   type="button"
                   onClick={() => setShowNewSupplierModal(false)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+                  className="btn btn-secondary"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+                  className="btn btn-primary"
                 >
                   Save Supplier
                 </button>
@@ -368,158 +384,189 @@ const Purchases = () => {
         </div>
       )}
 
-      {/* Modal: New Purchase Voucher Entry */}
+      {/* Modal: Record Purchase Voucher Entry */}
       {showNewPurchaseModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto relative">
-            <button 
-              onClick={() => setShowNewPurchaseModal(false)}
-              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Record Purchase Voucher</h3>
-            <p className="text-xs text-gray-500 mb-6">
-              Purchased items will automatically increment product stock. Selling price in store remains unchanged.
-            </p>
-
-            <form onSubmit={handleCreatePurchase} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Select Supplier *</label>
-                  <select
-                    required
-                    value={purchaseForm.supplierId}
-                    onChange={(e) => setPurchaseForm({ ...purchaseForm, supplierId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">-- Choose Supplier --</option>
-                    {suppliers.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Invoice Date</label>
-                  <input
-                    type="date"
-                    value={purchaseForm.invoiceDate}
-                    onChange={(e) => setPurchaseForm({ ...purchaseForm, invoiceDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Paid Amount (₹)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={purchaseForm.paidAmount}
-                    onChange={(e) => setPurchaseForm({ ...purchaseForm, paidAmount: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none"
-                  />
-                </div>
+        <div className="modal-overlay" onClick={() => setShowNewPurchaseModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 760 }}>
+            <div className="modal-header">
+              <div>
+                <h2>Record Purchase Voucher</h2>
+                <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Purchased items will automatically increment product stock. Selling price in store remains unchanged.
+                </p>
               </div>
+              <button className="btn-icon" onClick={() => setShowNewPurchaseModal(false)}>
+                <X size={16} />
+              </button>
+            </div>
 
-              {/* Line Items */}
-              <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Purchase Items</h4>
-                  <button
-                    type="button"
-                    onClick={addItemRow}
-                    className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Product Item
-                  </button>
+            <form onSubmit={handleCreatePurchase} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <div className="modal-body">
+                <div className="form-grid-3">
+                  <div className="form-group">
+                    <label className="form-label">Select Supplier *</label>
+                    <select
+                      required
+                      value={purchaseForm.supplierId}
+                      onChange={(e) => setPurchaseForm({ ...purchaseForm, supplierId: e.target.value })}
+                      className="form-select"
+                    >
+                      <option value="">-- Choose Supplier --</option>
+                      {suppliers.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Invoice Date</label>
+                    <input
+                      type="date"
+                      value={purchaseForm.invoiceDate}
+                      onChange={(e) => setPurchaseForm({ ...purchaseForm, invoiceDate: e.target.value })}
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Paid Amount (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={purchaseForm.paidAmount}
+                      onChange={(e) => setPurchaseForm({ ...purchaseForm, paidAmount: Number(e.target.value) })}
+                      className="form-input"
+                    />
+                  </div>
                 </div>
 
-                {purchaseForm.items.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-gray-200 shadow-2xs">
-                    <div className="flex-1">
-                      <select
-                        required
-                        value={item.productId}
-                        onChange={(e) => handleItemChange(idx, 'productId', e.target.value)}
-                        className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs outline-none"
-                      >
-                        <option value="">-- Select Product --</option>
-                        {products.map(p => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} (Stock: {p.stockQty} {p.unit})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="w-24">
-                      <input
-                        type="number"
-                        min="1"
-                        placeholder="Qty"
-                        required
-                        value={item.quantity}
-                        onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs outline-none"
-                      />
-                    </div>
-
-                    <div className="w-32">
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="Purchase Rate ₹"
-                        required
-                        value={item.purchaseRate}
-                        onChange={(e) => handleItemChange(idx, 'purchaseRate', e.target.value)}
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs outline-none"
-                      />
-                    </div>
-
-                    <div className="w-28 text-right font-bold text-xs text-gray-900">
-                      ₹{(item.quantity * item.purchaseRate).toLocaleString()}
-                    </div>
-
+                {/* Line Items */}
+                <div style={{
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 16,
+                  backgroundColor: 'var(--bg-primary)',
+                  marginBottom: 16
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Purchase Items</h4>
                     <button
                       type="button"
-                      onClick={() => removeItemRow(idx)}
-                      disabled={purchaseForm.items.length === 1}
-                      className="text-red-500 hover:text-red-700 disabled:opacity-30 p-1"
+                      onClick={addItemRow}
+                      className="btn btn-secondary"
+                      style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}
                     >
-                      <X className="w-4 h-4" />
+                      <Plus size={12} /> Add Item
                     </button>
                   </div>
-                ))}
 
-                <div className="flex justify-between items-center pt-3 border-t border-gray-200 font-bold text-sm">
-                  <span>Grand Total:</span>
-                  <span className="text-indigo-600 text-base">₹{calculateTotal().toLocaleString()}</span>
+                  {purchaseForm.items.map((item, idx) => (
+                    <div key={idx} style={{
+                      display: 'flex',
+                      gap: 12,
+                      alignItems: 'center',
+                      backgroundColor: 'var(--bg-secondary)',
+                      padding: 12,
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--border-color)',
+                      marginBottom: 8
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <select
+                          required
+                          value={item.productId}
+                          onChange={(e) => handleItemChange(idx, 'productId', e.target.value)}
+                          className="form-select"
+                          style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                        >
+                          <option value="">-- Select Product --</option>
+                          {products.map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} (Stock: {p.stockQty} {p.unit})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div style={{ width: 90 }}>
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="Qty"
+                          required
+                          value={item.quantity}
+                          onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
+                          className="form-input"
+                          style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                        />
+                      </div>
+
+                      <div style={{ width: 120 }}>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Rate ₹"
+                          required
+                          value={item.purchaseRate}
+                          onChange={(e) => handleItemChange(idx, 'purchaseRate', e.target.value)}
+                          className="form-input"
+                          style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                        />
+                      </div>
+
+                      <div style={{ width: 100, textAlign: 'right', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                        ₹{(item.quantity * item.purchaseRate).toLocaleString()}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => removeItemRow(idx)}
+                        disabled={purchaseForm.items.length === 1}
+                        className="btn-icon"
+                        style={{ color: 'var(--danger)', opacity: purchaseForm.items.length === 1 ? 0.3 : 1 }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingTop: 12,
+                    borderTop: '1px solid var(--border-color)',
+                    fontWeight: 'bold',
+                    fontSize: '0.9rem'
+                  }}>
+                    <span>Grand Total:</span>
+                    <span style={{ color: 'var(--primary)', fontSize: '1.1rem' }}>₹{calculateTotal().toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Notes / Remarks</label>
+                  <textarea
+                    rows={2}
+                    value={purchaseForm.notes}
+                    onChange={(e) => setPurchaseForm({ ...purchaseForm, notes: e.target.value })}
+                    className="form-textarea"
+                    placeholder="Optional notes or supplier invoice terms..."
+                  />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Notes / Remarks</label>
-                <textarea
-                  rows={2}
-                  value={purchaseForm.notes}
-                  onChange={(e) => setPurchaseForm({ ...purchaseForm, notes: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs outline-none"
-                  placeholder="Optional notes or supplier invoice terms..."
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="modal-footer">
                 <button
                   type="button"
                   onClick={() => setShowNewPurchaseModal(false)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+                  className="btn btn-secondary"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm"
+                  className="btn btn-primary"
                 >
                   Save & Update Stock
                 </button>
@@ -531,63 +578,77 @@ const Purchases = () => {
 
       {/* Modal: View Single Purchase Invoice */}
       {selectedPurchaseDetails && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-xl relative">
-            <button 
-              onClick={() => setSelectedPurchaseDetails(null)}
-              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <div className="flex items-center justify-between border-b pb-4 mb-4">
+        <div className="modal-overlay" onClick={() => setSelectedPurchaseDetails(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+            <div className="modal-header">
               <div>
-                <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Purchase Voucher</span>
-                <h3 className="text-xl font-bold text-gray-900">{selectedPurchaseDetails.purchaseNumber}</h3>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', uppercase: 'true', letterSpacing: 0.5 }}>Purchase Voucher</span>
+                <h2>{selectedPurchaseDetails.purchaseNumber}</h2>
               </div>
-              <div className="text-right">
-                <span className="text-xs text-gray-500 block">Date</span>
-                <span className="text-sm font-semibold">{new Date(selectedPurchaseDetails.invoiceDate).toLocaleDateString()}</span>
-              </div>
+              <button className="btn-icon" onClick={() => setSelectedPurchaseDetails(null)}>
+                <X size={16} />
+              </button>
             </div>
-
-            <div className="grid grid-cols-2 gap-4 text-xs mb-4 bg-gray-50 p-3 rounded-xl border">
-              <div>
-                <span className="text-gray-500 block">Supplier</span>
-                <strong className="text-gray-900 text-sm">{selectedPurchaseDetails.supplierName}</strong>
-                {selectedPurchaseDetails.supplierGstin && (
-                  <span className="block text-gray-500 mt-0.5">GSTIN: {selectedPurchaseDetails.supplierGstin}</span>
-                )}
+            <div className="modal-body">
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 16,
+                backgroundColor: 'var(--bg-primary)',
+                padding: 16,
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-color)',
+                marginBottom: 20
+              }}>
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', marginBottom: 4 }}>Supplier</span>
+                  <strong>{selectedPurchaseDetails.supplierName}</strong>
+                  {selectedPurchaseDetails.supplierGstin && (
+                    <span style={{ display: 'block', color: 'var(--text-muted)', marginTop: 4, fontSize: '0.75rem' }}>GSTIN: {selectedPurchaseDetails.supplierGstin}</span>
+                  )}
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase', marginBottom: 4 }}>Voucher Details</span>
+                  <span style={{ display: 'block', fontSize: '0.85rem' }}>Date: <strong>{new Date(selectedPurchaseDetails.invoiceDate).toLocaleDateString()}</strong></span>
+                  <span style={{ display: 'block', fontSize: '0.85rem', marginTop: 4 }}>Status: <strong style={{ color: 'var(--primary)' }}>{selectedPurchaseDetails.paymentStatus}</strong></span>
+                </div>
               </div>
-              <div className="text-right">
-                <span className="text-gray-500 block">Payment Status</span>
-                <span className="font-bold text-sm text-indigo-600">{selectedPurchaseDetails.paymentStatus}</span>
-              </div>
-            </div>
 
-            <table className="w-full text-left border-collapse text-xs mb-4">
-              <thead>
-                <tr className="bg-gray-100 text-gray-600 font-semibold">
-                  <th className="p-2">Item</th>
-                  <th className="p-2">Quantity</th>
-                  <th className="p-2">Purchase Rate</th>
-                  <th className="p-2 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {selectedPurchaseDetails.items.map((it) => (
-                  <tr key={it.id}>
-                    <td className="p-2 font-medium">{it.productName} ({it.productSku})</td>
-                    <td className="p-2">{it.quantity} {it.unit}</td>
-                    <td className="p-2">₹{it.purchaseRate}</td>
-                    <td className="p-2 text-right font-bold">₹{it.totalAmount.toLocaleString()}</td>
+              <table className="custom-table" style={{ marginBottom: 20 }}>
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Quantity</th>
+                    <th>Purchase Rate</th>
+                    <th style={{ textAlign: 'right' }}>Total</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {selectedPurchaseDetails.items.map((it) => (
+                    <tr key={it.id}>
+                      <td style={{ fontWeight: 600 }}>{it.productName} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>SKU: {it.productSku}</span></td>
+                      <td>{it.quantity} {it.unit}</td>
+                      <td>₹{it.purchaseRate.toLocaleString()}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{it.totalAmount.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
 
-            <div className="flex justify-between items-center border-t pt-4 font-bold text-sm">
-              <span>Total Invoice Amount:</span>
-              <span className="text-indigo-600 text-base">₹{selectedPurchaseDetails.totalAmount.toLocaleString()}</span>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingTop: 16,
+                borderTop: '1px solid var(--border-color)',
+                fontWeight: 'bold'
+              }}>
+                <span>Total Invoice Amount:</span>
+                <span style={{ color: 'var(--primary)', fontSize: '1.2rem' }}>₹{selectedPurchaseDetails.totalAmount.toLocaleString()}</span>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setSelectedPurchaseDetails(null)}>Close</button>
             </div>
           </div>
         </div>
