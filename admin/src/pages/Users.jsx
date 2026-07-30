@@ -21,6 +21,42 @@ const Users = () => {
     pincode: ''
   });
   const [submitting, setSubmitting] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [creditLimitInput, setCreditLimitInput] = useState('0');
+
+  const handleEditCreditLimit = (user) => {
+    setEditingUser(user);
+    const profile = user.retailer_profile || {};
+    const limitInRupees = profile.credit_limit ? (profile.credit_limit / 100) : 0;
+    setCreditLimitInput(String(limitInRupees));
+    setShowEditModal(true);
+  };
+
+  const handleSaveCreditLimit = async (e) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    
+    const limitNum = parseFloat(creditLimitInput);
+    if (isNaN(limitNum) || limitNum < 0) {
+      alert('Please enter a valid positive number for the credit limit.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.patch(`/admin/retailers/${editingUser.id}/credit-limit`, {
+        credit_limit: limitNum
+      });
+      alert('Credit limit updated successfully!');
+      setShowEditModal(false);
+      loadUsers();
+    } catch (err) {
+      alert(err.response?.data?.message || err.response?.data?.detail || 'Error updating credit limit');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleAddVendor = async (e) => {
     e.preventDefault();
@@ -237,7 +273,7 @@ const Users = () => {
                       </td>
                       <td>{rp.business_type || 'N/A'}</td>
                       <td style={{ fontWeight: 600, color: 'var(--success)' }}>
-                        INR {(rp.credit_limit / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        INR {((rp.credit_limit || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -249,12 +285,22 @@ const Users = () => {
                         <span className={`badge ${u.status}`}>{u.status}</span>
                       </td>
                       <td>
-                        <button 
-                          className={`btn btn-sm ${u.status === 'active' ? 'btn-danger' : 'btn-success'}`} 
-                          onClick={() => toggleStatus(u.id, u.status)}
-                        >
-                          {u.status === 'active' ? 'Block' : 'Activate'}
-                        </button>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button 
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => handleEditCreditLimit(u)}
+                            style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            className={`btn btn-sm ${u.status === 'active' ? 'btn-danger' : 'btn-success'}`} 
+                            onClick={() => toggleStatus(u.id, u.status)}
+                            style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                          >
+                            {u.status === 'active' ? 'Block' : 'Activate'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -395,6 +441,48 @@ const Users = () => {
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={submitting}>
                   {submitting ? 'Creating...' : 'Create Vendor'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {showEditModal && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h2>Set Credit Limit</h2>
+              <button className="btn-close" onClick={() => setShowEditModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-secondary)' }}>&times;</button>
+            </div>
+            <form onSubmit={handleSaveCreditLimit}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600 }}>Retailer Owner</label>
+                  <input type="text" className="form-input" disabled value={editingUser?.retailer_profile?.owner_name || editingUser?.full_name || ''} style={{ background: 'var(--bg-secondary)', cursor: 'not-allowed' }} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600 }}>Business Name</label>
+                  <input type="text" className="form-input" disabled value={editingUser?.retailer_profile?.business_name || 'N/A'} style={{ background: 'var(--bg-secondary)', cursor: 'not-allowed' }} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600 }}>Credit Limit (in INR) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="form-input"
+                    required
+                    value={creditLimitInput}
+                    onChange={e => setCreditLimitInput(e.target.value)}
+                    placeholder="Enter limit, e.g. 50000"
+                  />
+                  <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>Default value will be 0 when user credit account.</small>
+                </div>
+              </div>
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>

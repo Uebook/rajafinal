@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { Zap } from 'lucide-react';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@ambdmp.com');
+  const [password, setPassword] = useState('change-me-on-first-login');
   const [error, setError] = useState('');
   const { login, loading } = useAuth();
   const navigate = useNavigate();

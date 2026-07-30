@@ -308,7 +308,7 @@ const Products = () => {
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                <div className="form-grid-3">
                   <div className="form-group">
                     <label className="form-label">Category</label>
                     <select
@@ -434,7 +434,7 @@ const Products = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">Base Price (paise)</label>
                     <input
@@ -459,7 +459,7 @@ const Products = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">Vendor Price (paise)</label>
                     <input
@@ -481,7 +481,7 @@ const Products = () => {
                     />
                   </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">Stock Qty</label>
                     <input
@@ -509,7 +509,7 @@ const Products = () => {
                     onChange={e => setForm({ ...form, description: e.target.value })}
                   />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">Return Policy</label>
                     <select

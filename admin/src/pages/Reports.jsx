@@ -40,23 +40,35 @@ const CustomTooltip = ({ active, payload, label }) => {
 const Reports = () => {
   const [report, setReport] = useState(null);
   const [range, setRange] = useState('monthly');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const { data } = await api.get('/admin/reports/sales', { params: { range } });
+        const params = { range };
+        if (range === 'custom') {
+          params.month = selectedMonth;
+          params.year = selectedYear;
+        }
+        const { data } = await api.get('/admin/reports/sales', { params });
         setReport(data);
       } catch (err) { console.error(err); }
       finally { setLoading(false); }
     };
     load();
-  }, [range]);
+  }, [range, selectedMonth, selectedYear]);
 
   const downloadPdfReport = async () => {
     try {
+      const params = { range };
+      if (range === 'custom') {
+        params.month = selectedMonth;
+        params.year = selectedYear;
+      }
       const response = await api.get('/admin/reports/sales/pdf', {
-        params: { range },
+        params,
         responseType: 'blob'
       });
       const blob = new Blob([response.data], { type: 'application/pdf' });
@@ -73,6 +85,32 @@ const Reports = () => {
     }
   };
 
+  const downloadCsvReport = async () => {
+    try {
+      const endpoint = range === 'monthly' ? '/admin/orders/export/monthly' : '/admin/orders/export/daily';
+      const params = {};
+      if (range === 'custom') {
+        params.month = selectedMonth;
+        params.year = selectedYear;
+      }
+      const response = await api.get(endpoint, {
+        params,
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${range}_sales_report_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+    } catch (err) {
+      console.error('Error downloading CSV report:', err);
+      alert('Error downloading CSV report');
+    }
+  };
+
   const fmt = (paise) => `INR ${((paise || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 
   if (loading) return <div className="loading-center"><div className="spinner" /></div>;
@@ -86,9 +124,29 @@ const Reports = () => {
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
+            <option value="custom">Month/Year Filter</option>
           </select>
+          
+          {range === 'custom' && (
+            <>
+              <select className="select-filter" style={{ marginBottom: 0 }} value={selectedMonth} onChange={e => { setSelectedMonth(Number(e.target.value)); setLoading(true); }}>
+                {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((m, idx) => (
+                  <option key={m} value={idx + 1}>{m}</option>
+                ))}
+              </select>
+              <select className="select-filter" style={{ marginBottom: 0 }} value={selectedYear} onChange={e => { setSelectedYear(Number(e.target.value)); setLoading(true); }}>
+                {[2024, 2025, 2026, 2027, 2028].map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </>
+          )}
+
           <button className="btn btn-secondary" onClick={downloadPdfReport}>
             Download PDF
+          </button>
+          <button className="btn btn-secondary" onClick={downloadCsvReport}>
+            Export CSV
           </button>
         </div>
       </div>
