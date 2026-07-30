@@ -227,6 +227,9 @@ router.post('/orders', getCurrentUser as any, async (req: AuthenticatedRequest, 
         referenceType: 'order',
         referenceId: orderId,
         description: `Order ${orderNumber}`,
+        voucherType: 'SALES',
+        debitAccount: `Retailer: ${req.user!.fullName}`,
+        creditAccount: 'Sales Account',
       } as any);
 
       await tx

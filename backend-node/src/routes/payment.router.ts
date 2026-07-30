@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { getCurrentUser, AuthenticatedRequest } from '../middleware/auth.js';
 import { db } from '../db/index.js';
-import { orders, payments, ledgerEntries } from '../db/schema.js';
+import { orders, payments, ledgerEntries, users } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import { AppError } from '../utils/errors.js';
 import crypto from 'crypto';
@@ -112,6 +112,8 @@ router.post('/payments/verify', getCurrentUser as any, async (req: Authenticated
           })
           .where(eq(orders.id, order.id));
 
+        const [usr] = await tx.select().from(users).where(eq(users.id, payment.userId));
+
         await tx.insert(ledgerEntries).values({
           id: crypto.randomUUID(),
           userId: payment.userId,
@@ -120,6 +122,9 @@ router.post('/payments/verify', getCurrentUser as any, async (req: Authenticated
           referenceType: 'payment',
           referenceId: payment.id,
           description: `Razorpay online payment - Order ${order.orderNumber}`,
+          voucherType: 'RECEIPT',
+          debitAccount: 'Cash/Bank Account',
+          creditAccount: `Retailer: ${usr?.fullName || 'Retailer'}`,
         } as any);
       }
     });
