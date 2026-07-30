@@ -1,6 +1,5 @@
 // /** Server host — matches api.ts BASE_URL */
-const SERVER_HOST = 'raja1-hnmg.onrender.com';
-// const SERVER_HOST = '192.168.1.38:8000';
+const SERVER_HOST = 'backend-node-delta-seven.vercel.app';
 
 
 /**

@@ -32,7 +32,9 @@ const VendorLoginScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const [role, setRole] = useState<'vendor' | 'retailer'>(route?.params?.role || 'vendor');
   const [step, setStep] = useState<'mobile' | 'otp'>('mobile');
-  const [mobile, setMobile] = useState('');
+  const [mobile, setMobile] = useState(route?.params?.role === 'retailer' ? '9812345671' : '9876543210');
+  const [password, setPassword] = useState('Test@1234');
+  const [loginMethod, setLoginMethod] = useState<'otp' | 'password'>('password');
 
   // OTP individual values
   const [otpVal, setOtpVal] = useState<string[]>(['', '', '', '', '', '']);
@@ -43,7 +45,10 @@ const VendorLoginScreen: React.FC<Props> = ({ route, navigation }) => {
 
   useEffect(() => {
     if (route?.params?.role) {
-      setRole(route.params.role);
+      const newRole = route.params.role;
+      setRole(newRole);
+      setMobile(newRole === 'retailer' ? '9812345671' : '9876543210');
+      setPassword('Test@1234');
     }
   }, [route?.params?.role]);
 
@@ -60,6 +65,38 @@ const VendorLoginScreen: React.FC<Props> = ({ route, navigation }) => {
         return prev - 1;
       });
     }, 1000);
+  };
+
+  const handlePasswordLogin = async () => {
+    if (!mobile || mobile.length < 10) {
+      Alert.alert('Error', 'Enter a valid 10-digit mobile number');
+      return;
+    }
+    if (!password) {
+      Alert.alert('Error', 'Please enter your password');
+      return;
+    }
+    setLoading(true);
+    try {
+      let res;
+      if (role === 'vendor') {
+        res = await api.post('/vendor/auth/password-login', { mobile: `+91${mobile}`, password });
+      } else {
+        res = await api.post('/retailer/auth/password-login', { mobile: `+91${mobile}`, password });
+      }
+      const profile = await api.get('/me', {
+        headers: { Authorization: `Bearer ${res.data.access_token}` },
+      });
+      dispatch(setCredentials({
+        accessToken: res.data.access_token,
+        refreshToken: res.data.refresh_token,
+        user: { ...profile.data, role: role },
+      }));
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data?.detail || 'Invalid mobile or password');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSendOTP = async () => {
@@ -201,17 +238,24 @@ const VendorLoginScreen: React.FC<Props> = ({ route, navigation }) => {
                 />
               </View>
 
-              <View style={styles.helperRow}>
-                <HelpCircle size={14} color={Colors.textMuted} />
-                <Text style={styles.helperText}>A 6-digit OTP will be sent to this number.</Text>
+              <Text style={[styles.inputLabel, { marginTop: 14 }]}>PASSWORD</Text>
+              <View style={[styles.phoneInputRow, { paddingHorizontal: 12 }]}>
+                <TextInput
+                  style={[styles.phoneInput, { paddingLeft: 0 }]}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  placeholder="Enter account password"
+                  placeholderTextColor="#7F7B7B"
+                />
               </View>
 
-              <TouchableOpacity style={styles.btn} onPress={handleSendOTP} activeOpacity={0.85} disabled={loading}>
+              <TouchableOpacity style={[styles.btn, { marginTop: 20 }]} onPress={handlePasswordLogin} activeOpacity={0.85} disabled={loading}>
                 {loading ? (
                   <ActivityIndicator size="small" color={Colors.white} />
                 ) : (
                   <>
-                    <Text style={styles.btnText}>Send OTP</Text>
+                    <Text style={styles.btnText}>Sign In</Text>
                     <ArrowRight size={16} color={Colors.white} strokeWidth={2.5} />
                   </>
                 )}

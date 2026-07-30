@@ -1,0 +1,20 @@
+{
+  "version": "6",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1784826961733,
+      "tag": "0000_moaning_arachne",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1785437520174,
+      "tag": "0001_add_purchases_tables",
+      "breakpoints": true
+    }
+  ]
+}

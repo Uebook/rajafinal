@@ -2,10 +2,10 @@
  * P5-13 — Cart Screen
  * Supply Setu premium design — product images, qty stepper, order summary, payment method.
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  Alert, RefreshControl, Image, ActivityIndicator,
+  Alert, RefreshControl, Image, ActivityIndicator, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -24,6 +24,11 @@ const CartItemCard: React.FC<{
   onRemove: (id: string) => void;
 }> = ({ item, onUpdateQty, onRemove }) => {
   const [imgError, setImgError] = useState(false);
+  const [qtyText, setQtyText] = useState(String(item.quantity));
+
+  useEffect(() => {
+    setQtyText(String(item.quantity));
+  }, [item.quantity]);
 
   // Image URL: cart item may carry product_image_url or images array
   const rawUrl = item.product_image_url ?? item.images?.[0]?.image_url ?? null;
@@ -72,14 +77,60 @@ const CartItemCard: React.FC<{
           <View style={styles.qtyControl}>
             <TouchableOpacity
               style={styles.qtyBtn}
-              onPress={() => item.quantity > 1 ? onUpdateQty(item.id, item.quantity - 1) : onRemove(item.id)}>
-              <Text style={styles.qtyBtnTxt}>−</Text>
+              onPress={() => {
+                const nextQty = item.quantity - 1;
+                if (nextQty > 0) {
+                  onUpdateQty(item.id, nextQty);
+                } else {
+                  onRemove(item.id);
+                }
+              }}>
+              <Text style={styles.qtyBtnText}>−</Text>
             </TouchableOpacity>
-            <Text style={styles.qtyVal}>{String(item.quantity).padStart(2, '0')}</Text>
+
+            <TextInput
+              style={styles.qtyInput}
+              value={qtyText}
+              keyboardType="number-pad"
+              onChangeText={(val) => {
+                setQtyText(val);
+                const num = parseInt(val.replace(/[^0-9]/g, ''), 10);
+                if (!isNaN(num) && num > 0) {
+                  if (num > item.stock_qty) {
+                    Alert.alert('Stock Limit Exceeded', `Only ${item.stock_qty} units available.`);
+                    onUpdateQty(item.id, item.stock_qty);
+                    setQtyText(String(item.stock_qty));
+                  } else {
+                    onUpdateQty(item.id, num);
+                  }
+                }
+              }}
+              onBlur={() => {
+                const num = parseInt(qtyText, 10);
+                if (isNaN(num) || num <= 0) {
+                  onUpdateQty(item.id, 1);
+                  setQtyText('1');
+                } else if (num > item.stock_qty) {
+                  onUpdateQty(item.id, item.stock_qty);
+                  setQtyText(String(item.stock_qty));
+                } else {
+                  onUpdateQty(item.id, num);
+                  setQtyText(String(num));
+                }
+              }}
+              selectTextOnFocus
+            />
+
             <TouchableOpacity
               style={styles.qtyBtn}
-              onPress={() => onUpdateQty(item.id, item.quantity + 1)}>
-              <Text style={styles.qtyBtnTxt}>+</Text>
+              onPress={() => {
+                if (item.quantity >= item.stock_qty) {
+                  Alert.alert('Stock Limit Exceeded', `Only ${item.stock_qty} units available.`);
+                  return;
+                }
+                onUpdateQty(item.id, item.quantity + 1);
+              }}>
+              <Text style={styles.qtyBtnText}>+</Text>
             </TouchableOpacity>
           </View>
           <Text style={styles.lineTotal}>{formatINR(lineTotal)}</Text>
@@ -124,7 +175,11 @@ const CartScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     try {
       await api.patch(`/cart/items/${itemId}`, { quantity: qty });
       loadCart();
-    } catch { Alert.alert('Error', 'Could not update quantity'); }
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.response?.data?.detail || 'Could not update quantity';
+      Alert.alert('Stock Limit', msg);
+      loadCart();
+    }
   };
 
   const removeItem = async (itemId: string) => {
@@ -388,7 +443,18 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.border,
   },
   qtyBtnTxt: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
-  qtyVal: { fontSize: 16, fontWeight: '800', color: Colors.textPrimary, minWidth: 28, textAlign: 'center' },
+  qtyInput: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    minWidth: 40,
+    textAlign: 'center',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    borderRadius: 6,
+    paddingVertical: 2,
+    backgroundColor: Colors.bgInput,
+  },
   lineTotal: { fontSize: 15, fontWeight: '800', color: Colors.primary },
 
   // Summary

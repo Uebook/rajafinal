@@ -73,10 +73,25 @@ router.post('/purchases', getCurrentUser as any, requireAdmin as any, async (req
   }
 });
 
+const updatePaymentSchema = z.object({
+  paidAmount: z.number().positive('Payment amount must be greater than 0'),
+});
+
 router.get('/purchases/:id', getCurrentUser as any, requireAdmin as any, async (req, res, next) => {
   try {
     const details = await purchaseService.getPurchaseDetails(req.params.id);
     return res.status(200).json(details);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/purchases/:id/payment', getCurrentUser as any, requireAdmin as any, async (req: any, res, next) => {
+  try {
+    const { id } = req.params;
+    const { paidAmount } = updatePaymentSchema.parse(req.body);
+    const purchase = await purchaseService.updatePurchasePayment(id, paidAmount, req.user!.id);
+    return res.status(200).json(purchase);
   } catch (error) {
     next(error);
   }

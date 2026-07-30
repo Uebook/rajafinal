@@ -4,7 +4,7 @@
  * Rebuilt to match the new vertical cards, gold labels, and custom headers.
  */
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAppSelector } from '../../hooks/useRedux';
@@ -106,20 +106,45 @@ const RoleSelectScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         </TouchableOpacity>
 
-        {/* Action Button */}
-        <TouchableOpacity style={styles.btn} onPress={handleContinue} activeOpacity={0.85}>
-          <Text style={styles.btnText}>{t('continueJourney')}</Text>
-        </TouchableOpacity>
-
-        {/* Sign In Link */}
-        <TouchableOpacity
-          onPress={() => navigation.navigate('VendorLogin', { role: selectedRole })}
-          style={styles.signInContainer}
-          activeOpacity={0.7}>
-          <Text style={styles.signInLabel}>
-            Already have an account? <Text style={styles.signInLinkText}>Sign In</Text>
-          </Text>
-        </TouchableOpacity>
+        {/* Action Buttons */}
+        {selectedRole === 'retailer' ? (
+          <View style={styles.actionButtonGroup}>
+            <TouchableOpacity 
+              style={styles.btnPrimary} 
+              onPress={() => navigation.navigate('RetailerRegister')} 
+              activeOpacity={0.85}>
+              <Text style={styles.btnPrimaryText}>REGISTER AS RETAILER</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.btnSecondary} 
+              onPress={() => navigation.navigate('VendorLogin', { role: 'retailer' })} 
+              activeOpacity={0.85}>
+              <Text style={styles.btnSecondaryText}>SIGN IN</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.actionButtonGroup}>
+            <TouchableOpacity 
+              style={styles.btnPrimary} 
+              onPress={() => navigation.navigate('VendorLogin', { role: 'vendor' })} 
+              activeOpacity={0.85}>
+              <Text style={styles.btnPrimaryText}>SIGN IN AS VENDOR</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.btnSecondary} 
+              onPress={() => {
+                Alert.alert(
+                  'Vendor Registration',
+                  'Vendor accounts must be created by the platform administrator. Please contact support to request a vendor account.'
+                );
+              }} 
+              activeOpacity={0.85}>
+              <Text style={styles.btnSecondaryText}>REQUEST ACCESS</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Onboarding steps */}
         <Text style={styles.stepFooter}>{t('step2of4')}</Text>
@@ -247,35 +272,42 @@ const styles = StyleSheet.create({
   textActive: {
     color: Colors.primary,
   },
-  btn: {
+  actionButtonGroup: {
+    width: '100%',
+    marginTop: Spacing.lg,
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  btnPrimary: {
     backgroundColor: '#000000',
     borderRadius: Radius.full,
     paddingVertical: 15,
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: Spacing.lg,
-    marginBottom: Spacing.md,
     ...Shadow.md,
   },
-  btnText: {
+  btnPrimaryText: {
     color: Colors.white,
     fontWeight: '700',
-    fontSize: Typography.body,
+    fontSize: 13,
     letterSpacing: 1,
   },
-  signInContainer: {
-    paddingVertical: Spacing.sm,
-    marginBottom: Spacing.md,
+  btnSecondary: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.full,
+    paddingVertical: 14,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#000000',
   },
-  signInLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  signInLinkText: {
-    color: Colors.primary,
+  btnSecondaryText: {
+    color: '#000000',
     fontWeight: '700',
+    fontSize: 13,
+    letterSpacing: 1,
   },
   stepFooter: {
     fontSize: 10,

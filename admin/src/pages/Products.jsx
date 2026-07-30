@@ -287,7 +287,7 @@ const Products = () => {
                 <X size={16} />
               </button>
             </div>
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <div className="modal-body">
                 <div className="form-group">
                   <label className="form-label">Name</label>

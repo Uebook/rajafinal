@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "prefabPath": "/Users/vansh/.gradle/caches/modules-2/files-2.1/com.google.prefab/cli/2.1.0/aa32fec809c44fa531f01dcfb739b5b3304d3050/cli-2.1.0-all.jar",
+  "packages": [
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/react-native-reanimated/android/build/intermediates/prefab_package/debug/prefab",
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/react-native-worklets/android/build/intermediates/prefab_package/debug/prefab",
+    "/Users/vansh/.gradle/caches/9.3.1/transforms/6a10fef6cd8472b44c3da6bb0d167d42/transformed/react-android-0.86.0-debug/prefab",
+    "/Users/vansh/.gradle/caches/9.3.1/transforms/b16a7e2c2d86db5d4425023797a396d6/transformed/hermes-android-250829098.0.14-debug/prefab",
+    "/Users/vansh/.gradle/caches/9.3.1/transforms/320e0b46f31b684057f113001bd4bb00/transformed/fbjni-0.7.0/prefab"
+  ]
+}

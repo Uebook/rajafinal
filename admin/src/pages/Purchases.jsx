@@ -41,6 +41,11 @@ const Purchases = () => {
     items: [{ productId: '', quantity: 1, purchaseRate: 0 }],
   });
 
+  // Payment Modal
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPurchaseForPayment, setSelectedPurchaseForPayment] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState(0);
+
   // Load Purchases, Suppliers, and Products
   const loadData = async () => {
     setLoading(true);
@@ -151,6 +156,27 @@ const Purchases = () => {
       setSelectedPurchaseDetails(data);
     } catch (err) {
       alert('Failed to fetch details');
+    }
+  };
+
+  const openRecordPayment = (purchase) => {
+    setSelectedPurchaseForPayment(purchase);
+    setPaymentAmount(purchase.totalAmount - purchase.paidAmount);
+    setShowPaymentModal(true);
+  };
+
+  const handleRecordPaymentSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedPurchaseForPayment) return;
+    try {
+      await api.patch(`/purchases/${selectedPurchaseForPayment.id}/payment`, {
+        paidAmount: Number(paymentAmount)
+      });
+      alert('Payment recorded successfully and Tally Daybook updated!');
+      setShowPaymentModal(false);
+      loadData();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to record payment');
     }
   };
 
@@ -282,6 +308,16 @@ const Purchases = () => {
                     >
                       <Eye size={16} />
                     </button>
+                    {p.paymentStatus !== 'PAID' && (
+                      <button
+                        onClick={() => openRecordPayment(p)}
+                        className="btn-icon"
+                        style={{ color: 'var(--secondary)', marginLeft: 8 }}
+                        title="Record Payment"
+                      >
+                        <DollarSign size={16} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -458,6 +494,25 @@ const Purchases = () => {
                     >
                       <Plus size={12} /> Add Item
                     </button>
+                  </div>
+
+                  {/* Header Row */}
+                  <div style={{
+                    display: 'flex',
+                    gap: 12,
+                    alignItems: 'center',
+                    padding: '0 12px 6px 12px',
+                    fontWeight: 'bold',
+                    fontSize: '0.75rem',
+                    color: 'var(--text-muted)',
+                    borderBottom: '1px solid var(--border-color)',
+                    marginBottom: 10
+                  }}>
+                    <div style={{ flex: 1 }}>Product Name</div>
+                    <div style={{ width: 90 }}>Qty / Unit</div>
+                    <div style={{ width: 120 }}>Purchase Rate (₹)</div>
+                    <div style={{ width: 100, textAlign: 'right' }}>Total Amount</div>
+                    <div style={{ width: 28 }}></div>
                   </div>
 
                   {purchaseForm.items.map((item, idx) => (
@@ -650,6 +705,71 @@ const Purchases = () => {
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setSelectedPurchaseDetails(null)}>Close</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Record Payment */}
+      {showPaymentModal && selectedPurchaseForPayment && (
+        <div className="modal-overlay" onClick={() => setShowPaymentModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div className="modal-header">
+              <h2>Record Supplier Payment</h2>
+              <button className="btn-icon" onClick={() => setShowPaymentModal(false)}>
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleRecordPaymentSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <div className="modal-body">
+                <div style={{
+                  backgroundColor: 'var(--bg-primary)',
+                  padding: 16,
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-color)',
+                  marginBottom: 16,
+                  fontSize: '0.85rem',
+                  lineHeight: '1.5'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Supplier:</span>
+                    <strong>{selectedPurchaseForPayment.supplierName}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Invoice Number:</span>
+                    <strong>{selectedPurchaseForPayment.purchaseNumber}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Invoice Total:</span>
+                    <strong>₹{selectedPurchaseForPayment.totalAmount.toLocaleString()}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Amount Paid:</span>
+                    <strong style={{ color: 'var(--secondary)' }}>₹{selectedPurchaseForPayment.paidAmount.toLocaleString()}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 6, borderTop: '1px solid var(--border-color)', marginTop: 6 }}>
+                    <span style={{ color: 'var(--text-muted)', fontWeight: 'bold' }}>Pending Payable:</span>
+                    <strong style={{ color: 'var(--danger)' }}>₹{(selectedPurchaseForPayment.totalAmount - selectedPurchaseForPayment.paidAmount).toLocaleString()}</strong>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Payment Amount (₹) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={selectedPurchaseForPayment.totalAmount - selectedPurchaseForPayment.paidAmount}
+                    required
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowPaymentModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Submit Payment</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

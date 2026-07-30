@@ -1,0 +1,148 @@
+{
+  "buildFiles": [
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/@react-native-community/netinfo/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/react-native-gesture-handler/android/CMakeLists.txt",
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/react-native-image-picker/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/react-native-keychain/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/react-native-razorpay/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/react-native-reanimated/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt",
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/react-native-screens/android/src/main/jni/CMakeLists.txt",
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/react-native-svg/android/src/main/jni/CMakeLists.txt",
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/react-native-vector-icons/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/react-native-webview/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/react-native-worklets/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/vansh/ReactProject/raja1/mobile/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/Users/vansh/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/Users/vansh/ReactProject/raja1/mobile/android/app/C:/Users/DELL/b/RelWithDebInfo/5ib3z5v2/armeabi-v7a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/Users/vansh/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/Users/vansh/ReactProject/raja1/mobile/android/app/C:/Users/DELL/b/RelWithDebInfo/5ib3z5v2/armeabi-v7a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "appmodules::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "appmodules",
+      "output": "/Users/vansh/ReactProject/raja1/mobile/android/app/build/intermediates/cxx/RelWithDebInfo/5ib3z5v2/obj/armeabi-v7a/libappmodules.so",
+      "runtimeFiles": [
+        "/Users/vansh/ReactProject/raja1/mobile/android/app/build/intermediates/cxx/RelWithDebInfo/5ib3z5v2/obj/armeabi-v7a/libreact_codegen_rngesturehandler_codegen.so",
+        "/Users/vansh/ReactProject/raja1/mobile/android/app/build/intermediates/cxx/RelWithDebInfo/5ib3z5v2/obj/armeabi-v7a/libreact_codegen_safeareacontext.so",
+        "/Users/vansh/ReactProject/raja1/mobile/android/app/build/intermediates/cxx/RelWithDebInfo/5ib3z5v2/obj/armeabi-v7a/libreact_codegen_rnscreens.so",
+        "/Users/vansh/ReactProject/raja1/mobile/android/app/build/intermediates/cxx/RelWithDebInfo/5ib3z5v2/obj/armeabi-v7a/libreact_codegen_rnsvg.so",
+        "/Users/vansh/.gradle/caches/9.3.1/transforms/320e0b46f31b684057f113001bd4bb00/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.armeabi-v7a/libfbjni.so",
+        "/Users/vansh/.gradle/caches/9.3.1/transforms/46be4d387957ff21c123c4271b42e728/transformed/react-android-0.86.0-release/prefab/modules/jsi/libs/android.armeabi-v7a/libjsi.so",
+        "/Users/vansh/.gradle/caches/9.3.1/transforms/46be4d387957ff21c123c4271b42e728/transformed/react-android-0.86.0-release/prefab/modules/reactnative/libs/android.armeabi-v7a/libreactnative.so"
+      ]
+    },
+    "react_codegen_AsyncStorageSpec::@15af80695a6281ecf900": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "react_codegen_AsyncStorageSpec"
+    },
+    "react_codegen_RNCNetInfoSpec::@c36c96bfd5b5770618a5": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "react_codegen_RNCNetInfoSpec"
+    },
+    "react_codegen_RNCWebViewSpec::@eb48929f9f7453740a6c": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "react_codegen_RNCWebViewSpec"
+    },
+    "react_codegen_RNImagePickerSpec::@f66ee9a2efecfb28bee4": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "react_codegen_RNImagePickerSpec"
+    },
+    "react_codegen_RNKeychainSpec::@f9a2cb36ebca2de4baf9": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "react_codegen_RNKeychainSpec"
+    },
+    "react_codegen_RNRazorpayCheckoutSpec::@ba471378ee2eecf9e7b3": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "react_codegen_RNRazorpayCheckoutSpec"
+    },
+    "react_codegen_RNVectorIconsSpec::@479809fae146501fd34d": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "react_codegen_RNVectorIconsSpec"
+    },
+    "react_codegen_rngesturehandler_codegen::@39f233abcd2c728bc6ec": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "react_codegen_rngesturehandler_codegen",
+      "output": "/Users/vansh/ReactProject/raja1/mobile/android/app/build/intermediates/cxx/RelWithDebInfo/5ib3z5v2/obj/armeabi-v7a/libreact_codegen_rngesturehandler_codegen.so",
+      "runtimeFiles": [
+        "/Users/vansh/.gradle/caches/9.3.1/transforms/320e0b46f31b684057f113001bd4bb00/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.armeabi-v7a/libfbjni.so",
+        "/Users/vansh/.gradle/caches/9.3.1/transforms/46be4d387957ff21c123c4271b42e728/transformed/react-android-0.86.0-release/prefab/modules/jsi/libs/android.armeabi-v7a/libjsi.so",
+        "/Users/vansh/.gradle/caches/9.3.1/transforms/46be4d387957ff21c123c4271b42e728/transformed/react-android-0.86.0-release/prefab/modules/reactnative/libs/android.armeabi-v7a/libreactnative.so"
+      ]
+    },
+    "react_codegen_rnreanimated::@8afabad14bfffa3f8b9a": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "react_codegen_rnreanimated"
+    },
+    "react_codegen_rnscreens::@25bcbd507e98d3a854ad": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "react_codegen_rnscreens",
+      "output": "/Users/vansh/ReactProject/raja1/mobile/android/app/build/intermediates/cxx/RelWithDebInfo/5ib3z5v2/obj/armeabi-v7a/libreact_codegen_rnscreens.so",
+      "runtimeFiles": [
+        "/Users/vansh/.gradle/caches/9.3.1/transforms/46be4d387957ff21c123c4271b42e728/transformed/react-android-0.86.0-release/prefab/modules/reactnative/libs/android.armeabi-v7a/libreactnative.so",
+        "/Users/vansh/.gradle/caches/9.3.1/transforms/46be4d387957ff21c123c4271b42e728/transformed/react-android-0.86.0-release/prefab/modules/jsi/libs/android.armeabi-v7a/libjsi.so",
+        "/Users/vansh/.gradle/caches/9.3.1/transforms/320e0b46f31b684057f113001bd4bb00/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.armeabi-v7a/libfbjni.so"
+      ]
+    },
+    "react_codegen_rnsvg::@4f40eb209d0c0b4a3b65": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "react_codegen_rnsvg",
+      "output": "/Users/vansh/ReactProject/raja1/mobile/android/app/build/intermediates/cxx/RelWithDebInfo/5ib3z5v2/obj/armeabi-v7a/libreact_codegen_rnsvg.so",
+      "runtimeFiles": [
+        "/Users/vansh/.gradle/caches/9.3.1/transforms/46be4d387957ff21c123c4271b42e728/transformed/react-android-0.86.0-release/prefab/modules/reactnative/libs/android.armeabi-v7a/libreactnative.so",
+        "/Users/vansh/.gradle/caches/9.3.1/transforms/46be4d387957ff21c123c4271b42e728/transformed/react-android-0.86.0-release/prefab/modules/jsi/libs/android.armeabi-v7a/libjsi.so",
+        "/Users/vansh/.gradle/caches/9.3.1/transforms/320e0b46f31b684057f113001bd4bb00/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.armeabi-v7a/libfbjni.so"
+      ]
+    },
+    "react_codegen_rnworklets::@68f58d84d4754f193387": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "react_codegen_rnworklets"
+    },
+    "react_codegen_safeareacontext::@7984cd80db47aa7b952a": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "react_codegen_safeareacontext",
+      "output": "/Users/vansh/ReactProject/raja1/mobile/android/app/build/intermediates/cxx/RelWithDebInfo/5ib3z5v2/obj/armeabi-v7a/libreact_codegen_safeareacontext.so",
+      "runtimeFiles": [
+        "/Users/vansh/.gradle/caches/9.3.1/transforms/320e0b46f31b684057f113001bd4bb00/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.armeabi-v7a/libfbjni.so",
+        "/Users/vansh/.gradle/caches/9.3.1/transforms/46be4d387957ff21c123c4271b42e728/transformed/react-android-0.86.0-release/prefab/modules/jsi/libs/android.armeabi-v7a/libjsi.so",
+        "/Users/vansh/.gradle/caches/9.3.1/transforms/46be4d387957ff21c123c4271b42e728/transformed/react-android-0.86.0-release/prefab/modules/reactnative/libs/android.armeabi-v7a/libreactnative.so"
+      ]
+    }
+  },
+  "toolchains": {
+    "toolchain": {
+      "cCompilerExecutable": "/Users/vansh/Library/Android/sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang.lld",
+      "cppCompilerExecutable": "/Users/vansh/Library/Android/sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++.lld"
+    }
+  },
+  "cFileExtensions": [],
+  "cppFileExtensions": [
+    "cpp"
+  ]
+}

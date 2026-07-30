@@ -2,10 +2,10 @@
  * P5-11 — Product Detail Screen
  * Hero image gallery, role-based price, stock status, qty selector, Add to Cart.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, Image, Dimensions,
+  Alert, Image, Dimensions, TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../services/api';
@@ -19,9 +19,64 @@ const { width: SCREEN_W } = Dimensions.get('window');
 const ProductDetailScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const { product } = route.params;
   const [qty, setQty] = useState(1);
+  const [qtyInputText, setQtyInputText] = useState('1');
   const [addingCart, setAddingCart] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [activeImg, setActiveImg] = useState(0);
+
+  useEffect(() => {
+    if (isOutOfStock) {
+      setQty(0);
+      setQtyInputText('0');
+    }
+  }, [product.stock_qty]);
+
+  const handleQtyChange = (val: string) => {
+    setQtyInputText(val);
+    const num = parseInt(val.replace(/[^0-9]/g, ''), 10);
+    if (!isNaN(num) && num > 0) {
+      if (num > product.stock_qty) {
+        Alert.alert('Stock Limit Exceeded', `Only ${product.stock_qty} units available.`);
+        setQty(product.stock_qty);
+        setQtyInputText(String(product.stock_qty));
+      } else {
+        setQty(num);
+      }
+    }
+  };
+
+  const handleQtyBlur = () => {
+    const num = parseInt(qtyInputText, 10);
+    if (isNaN(num) || num <= 0) {
+      const fallback = isOutOfStock ? 0 : 1;
+      setQty(fallback);
+      setQtyInputText(String(fallback));
+    } else if (num > product.stock_qty) {
+      setQty(product.stock_qty);
+      setQtyInputText(String(product.stock_qty));
+    } else {
+      setQty(num);
+      setQtyInputText(String(num));
+    }
+  };
+
+  const incrementQty = () => {
+    if (isOutOfStock) return;
+    if (qty >= product.stock_qty) {
+      Alert.alert('Stock Limit Exceeded', `Only ${product.stock_qty} units available.`);
+      return;
+    }
+    const nextQty = Math.min(Math.max(1, product.stock_qty), qty + 1);
+    setQty(nextQty);
+    setQtyInputText(String(nextQty));
+  };
+
+  const decrementQty = () => {
+    if (isOutOfStock) return;
+    const nextQty = Math.max(1, qty - 1);
+    setQty(nextQty);
+    setQtyInputText(String(nextQty));
+  };
 
   // Collect all images
   const images: string[] = (product.images || [])
@@ -145,17 +200,32 @@ const ProductDetailScreen: React.FC<{ navigation: any; route: any }> = ({ naviga
 
           {/* Quantity Selector */}
           <View style={styles.qtySection}>
-            <Text style={styles.qtyLabel}>Quantity</Text>
+            <View style={styles.qtyLabelRow}>
+              <Text style={styles.qtyLabel}>Quantity</Text>
+              <Text style={[styles.stockLabel, { color: isOutOfStock ? Colors.error : product.stock_qty <= product.low_stock_threshold ? Colors.warning : Colors.success }]}>
+                {isOutOfStock ? 'Out of stock' : `${product.stock_qty} ${product.unit}s available`}
+              </Text>
+            </View>
             <View style={styles.qtyRow}>
               <TouchableOpacity
                 style={styles.qtyBtn}
-                onPress={() => setQty(Math.max(1, qty - 1))}>
+                disabled={isOutOfStock}
+                onPress={decrementQty}>
                 <Text style={styles.qtyBtnText}>−</Text>
               </TouchableOpacity>
-              <Text style={styles.qtyValue}>{qty}</Text>
+              <TextInput
+                style={styles.qtyInput}
+                value={qtyInputText}
+                keyboardType="number-pad"
+                onChangeText={handleQtyChange}
+                onBlur={handleQtyBlur}
+                selectTextOnFocus
+                editable={!isOutOfStock}
+              />
               <TouchableOpacity
                 style={styles.qtyBtn}
-                onPress={() => setQty(Math.min(Math.max(1, product.stock_qty), qty + 1))}>
+                disabled={isOutOfStock}
+                onPress={incrementQty}>
                 <Text style={styles.qtyBtnText}>+</Text>
               </TouchableOpacity>
             </View>
@@ -303,7 +373,9 @@ const styles = StyleSheet.create({
 
   // Qty
   qtySection: { marginBottom: Spacing.lg },
-  qtyLabel: { fontSize: Typography.body, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.sm },
+  qtyLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
+  qtyLabel: { fontSize: Typography.body, fontWeight: '700', color: Colors.textPrimary, marginBottom: 0 },
+  stockLabel: { fontSize: Typography.caption, fontWeight: '600' },
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xl },
   qtyBtn: {
     width: 44, height: 44, borderRadius: Radius.sm,
@@ -311,9 +383,17 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.border, ...Shadow.sm,
   },
   qtyBtnText: { fontSize: 22, fontWeight: '400', color: Colors.textPrimary, lineHeight: 26 },
-  qtyValue: {
-    fontSize: 22, fontWeight: '800',
-    color: Colors.textPrimary, minWidth: 40, textAlign: 'center',
+  qtyInput: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    minWidth: 60,
+    textAlign: 'center',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    borderRadius: Radius.sm,
+    paddingVertical: 4,
+    backgroundColor: Colors.bgCard,
   },
 
   // Summary

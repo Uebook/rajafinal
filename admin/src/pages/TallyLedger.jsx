@@ -155,6 +155,7 @@ const TallyLedger = () => {
                 <th>Voucher Type</th>
                 <th>Debit Account</th>
                 <th>Credit Account</th>
+                <th>Supplier / Buyer</th>
                 <th>Description / Particulars</th>
                 <th style={{ textAlign: 'right' }}>Debit Amount</th>
                 <th style={{ textAlign: 'right' }}>Credit Amount</th>
@@ -188,6 +189,16 @@ const TallyLedger = () => {
                   </td>
                   <td style={{ fontWeight: 600 }}>{v.debitAccount || '—'}</td>
                   <td style={{ fontWeight: 600 }}>{v.creditAccount || '—'}</td>
+                  <td>
+                    {v.partyName !== '—' ? (
+                      <div>
+                        <strong style={{ display: 'block' }}>{v.partyName}</strong>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{v.partyType}</span>
+                      </div>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>—</span>
+                    )}
+                  </td>
                   <td style={{ color: 'var(--text-secondary)', maxW: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={v.description}>{v.description}</td>
                   <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger)' }}>
                     {v.entryType === 'DEBIT' ? `₹${v.amount.toLocaleString()}` : '—'}

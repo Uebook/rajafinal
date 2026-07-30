@@ -1,5 +1,5 @@
 import { db } from '../db/index.js';
-import { purchases, purchaseItems, suppliers, products, ledgerEntries, users, orders } from '../db/schema.js';
+import { purchases, purchaseItems, suppliers, products, ledgerEntries, users, orders, retailers } from '../db/schema.js';
 import { eq, desc, sql, and, gte, lte } from 'drizzle-orm';
 import { AppError } from '../utils/errors.js';
 
@@ -212,6 +212,64 @@ export class PurchaseService {
     return { ...purchase, items };
   }
 
+  // Update Purchase Payment Status & Amount
+  async updatePurchasePayment(purchaseId: string, additionalPaidAmount: number, adminUserId: string) {
+    if (additionalPaidAmount <= 0) {
+      throw new AppError(400, 'Payment amount must be greater than 0', 'BAD_REQUEST');
+    }
+
+    return await db.transaction(async (tx) => {
+      // 1. Get Purchase
+      const [purchase] = await tx.select().from(purchases).where(and(eq(purchases.id, purchaseId), eq(purchases.isDeleted, false)));
+      if (!purchase) {
+        throw new AppError(404, 'Purchase voucher not found', 'NOT_FOUND');
+      }
+
+      const newPaidAmount = purchase.paidAmount + additionalPaidAmount;
+      if (newPaidAmount > purchase.totalAmount) {
+        throw new AppError(400, `Paid amount exceeds invoice total of ₹${purchase.totalAmount}`, 'BAD_REQUEST');
+      }
+
+      const newStatus = newPaidAmount >= purchase.totalAmount ? 'PAID' : 'PARTIAL';
+
+      // 2. Update Purchase
+      const [updatedPurchase] = await tx.update(purchases)
+        .set({
+          paidAmount: newPaidAmount,
+          paymentStatus: newStatus,
+          updatedAt: new Date()
+        })
+        .where(eq(purchases.id, purchaseId))
+        .returning();
+
+      // 3. Update Supplier balance (reduce payable amount)
+      const [supplier] = await tx.select().from(suppliers).where(eq(suppliers.id, purchase.supplierId));
+      if (supplier) {
+        await tx.update(suppliers)
+          .set({
+            balance: Math.max(0, supplier.balance - additionalPaidAmount),
+            updatedAt: new Date()
+          })
+          .where(eq(suppliers.id, purchase.supplierId));
+      }
+
+      // 4. Create Tally Ledger Payment entry
+      await tx.insert(ledgerEntries).values({
+        userId: adminUserId,
+        entryType: 'CREDIT',
+        amount: additionalPaidAmount,
+        referenceType: 'PURCHASE_PAYMENT',
+        referenceId: purchase.id,
+        description: `Payment for Purchase #${purchase.purchaseNumber} to ${supplier?.name || 'Supplier'}`,
+        voucherType: 'PAYMENT',
+        debitAccount: `Supplier: ${supplier?.name || 'Supplier'}`,
+        creditAccount: 'Cash/Bank Account',
+      });
+
+      return updatedPurchase;
+    });
+  }
+
   // Get Tally-like Unified Daybook (Purchase + Sales + Payments)
   async getTallyDaybook(filters?: { startDate?: string; endDate?: string }) {
     const conditions = [eq(ledgerEntries.isDeleted, false)];
@@ -233,11 +291,65 @@ export class PurchaseService {
       description: ledgerEntries.description,
       referenceType: ledgerEntries.referenceType,
       referenceId: ledgerEntries.referenceId,
+      userId: ledgerEntries.userId,
     })
     .from(ledgerEntries)
     .where(and(...conditions))
     .orderBy(desc(ledgerEntries.createdAt));
 
-    return vouchers;
+    // Fetch all users to map names
+    const userList = await db.select({
+      id: users.id,
+      fullName: users.fullName,
+      role: users.role,
+    }).from(users);
+
+    const retailerList = await db.select({
+      userId: retailers.userId,
+      businessName: retailers.businessName,
+    }).from(retailers);
+
+    // Fetch all purchases with supplier names
+    const purchaseList = await db.select({
+      id: purchases.id,
+      supplierName: suppliers.name,
+    })
+    .from(purchases)
+    .innerJoin(suppliers, eq(purchases.supplierId, suppliers.id));
+
+    return vouchers.map(v => {
+      let partyName = '—';
+      let partyType = '—';
+
+      const refTypeLower = (v.referenceType || '').toLowerCase();
+      if (refTypeLower === 'purchase' || refTypeLower === 'purchase_payment') {
+        const pur = purchaseList.find(p => p.id === v.referenceId);
+        if (pur) {
+          partyName = pur.supplierName;
+          partyType = 'Supplier';
+        } else {
+          const match = (v.description || '').match(/from\s+(.+)$/) || (v.description || '').match(/to\s+(.+)$/);
+          if (match && match[1]) {
+            partyName = match[1];
+          } else {
+            partyName = (v.creditAccount || '').replace('Supplier: ', '') || (v.debitAccount || '').replace('Supplier: ', '') || '—';
+          }
+          partyType = 'Supplier';
+        }
+      } else if (refTypeLower === 'order' || refTypeLower === 'payment') {
+        const u = userList.find(usr => usr.id === v.userId);
+        if (u) {
+          const ret = retailerList.find(r => r.userId === u.id);
+          partyName = ret ? `${ret.businessName} (${u.fullName})` : u.fullName;
+          partyType = 'Retailer (Buyer)';
+        }
+      }
+
+      return {
+        ...v,
+        partyName,
+        partyType,
+      };
+    });
   }
 }

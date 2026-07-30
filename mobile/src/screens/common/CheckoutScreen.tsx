@@ -2,8 +2,8 @@
  * P5-14 — Checkout Screen + P5-15 Payment (Razorpay stub)
  * Address input, coupon, order summary, Place Order CTA.
  */
-import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, Modal, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../services/api';
 import { useAppDispatch, useAppSelector } from '../../hooks/useRedux';
@@ -14,6 +14,46 @@ import { formatINR, calcCartTotals } from '../../utils/helpers';
 import { Config } from '../../config';
 import RazorpayCheckout from 'react-native-razorpay';
 import { ArrowLeft } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const INDIAN_STATES = [
+  { code: 'AP', name: 'Andhra Pradesh' },
+  { code: 'AR', name: 'Arunachal Pradesh' },
+  { code: 'AS', name: 'Assam' },
+  { code: 'BR', name: 'Bihar' },
+  { code: 'CG', name: 'Chhattisgarh' },
+  { code: 'GA', name: 'Goa' },
+  { code: 'GJ', name: 'Gujarat' },
+  { code: 'HR', name: 'Haryana' },
+  { code: 'HP', name: 'Himachal Pradesh' },
+  { code: 'JK', name: 'Jammu & Kashmir' },
+  { code: 'JH', name: 'Jharkhand' },
+  { code: 'KA', name: 'Karnataka' },
+  { code: 'KL', name: 'Kerala' },
+  { code: 'MP', name: 'Madhya Pradesh' },
+  { code: 'MH', name: 'Maharashtra' },
+  { code: 'MN', name: 'Manipur' },
+  { code: 'ML', name: 'Meghalaya' },
+  { code: 'MZ', name: 'Mizoram' },
+  { code: 'NL', name: 'Nagaland' },
+  { code: 'OD', name: 'Odisha' },
+  { code: 'PB', name: 'Punjab' },
+  { code: 'RJ', name: 'Rajasthan' },
+  { code: 'SK', name: 'Sikkim' },
+  { code: 'TN', name: 'Tamil Nadu' },
+  { code: 'TS', name: 'Telangana' },
+  { code: 'TR', name: 'Tripura' },
+  { code: 'UK', name: 'Uttarakhand' },
+  { code: 'UP', name: 'Uttar Pradesh' },
+  { code: 'WB', name: 'West Bengal' },
+  { code: 'AN', name: 'Andaman & Nicobar' },
+  { code: 'CH', name: 'Chandigarh' },
+  { code: 'DN', name: 'Dadra & Nagar Haveli' },
+  { code: 'DD', name: 'Daman & Diu' },
+  { code: 'DL', name: 'Delhi' },
+  { code: 'LD', name: 'Lakshadweep' },
+  { code: 'PY', name: 'Puducherry' }
+];
 
 const CheckoutScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const dispatch = useAppDispatch();
@@ -23,7 +63,31 @@ const CheckoutScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [coupon, setCoupon] = useState('');
   const [discount, setDiscount] = useState(0);
   const [placing, setPlacing] = useState(false);
+  const [stateModalVisible, setStateModalVisible] = useState(false);
+  const [availableCoupons, setAvailableCoupons] = useState<any[]>([]);
   const { subtotal, gst, grandTotal } = calcCartTotals(cartItems);
+
+  // Load saved address and available coupons on mount
+  useEffect(() => {
+    const initData = async () => {
+      try {
+        const savedAddr = await AsyncStorage.getItem('saved_delivery_address');
+        if (savedAddr) {
+          setAddress(JSON.parse(savedAddr));
+        }
+      } catch (e) {
+        console.error('Failed to load address', e);
+      }
+
+      try {
+        const { data } = await api.get('/discounts');
+        setAvailableCoupons(data || []);
+      } catch (e) {
+        console.error('Failed to load coupons', e);
+      }
+    };
+    initData();
+  }, []);
 
   const applyCoupon = async () => {
     if (!coupon.trim()) return;
@@ -32,19 +96,23 @@ const CheckoutScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       setDiscount(data.discount_amount || 0);
       Alert.alert('Coupon Applied', `Discount: ${formatINR(data.discount_amount)}`);
     } catch (err: any) {
-      Alert.alert('Invalid Coupon', err.response?.data?.detail || 'Could not apply coupon');
+      const msg = err.response?.data?.message || err.response?.data?.detail || 'Could not apply coupon';
+      Alert.alert('Invalid Coupon', msg);
     }
   };
 
   const placeOrder = async () => {
-    if (!address.line1 || !address.city || !address.pincode) {
+    if (!address.line1 || !address.city || !address.state || !address.pincode) {
       Alert.alert('Error', 'Please fill all address fields');
       return;
     }
     setPlacing(true);
     try {
+      // Auto-save address for next time
+      await AsyncStorage.setItem('saved_delivery_address', JSON.stringify(address));
+
       // 1. Format address object into string format expected by backend schema
-      const addressStr = `${address.line1}, ${address.city}, ${address.state || ''} - ${address.pincode}`;
+      const addressStr = `${address.line1}, ${address.city}, ${address.state} - ${address.pincode}`;
 
       // 2. Place Order (Atomic creation on backend)
       const { data: orderData } = await api.post('/orders', {
@@ -57,41 +125,18 @@ const CheckoutScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         order_id: orderData.id,
       });
 
-      // 4. Trigger Razorpay Checkout UI
-      const options = {
-        description: `Order ${orderData.order_number}`,
-        image: 'https://i.imgur.com/3g7urwK.png',
-        currency: 'INR',
-        key: Config.RAZORPAY_KEY,
-        amount: orderData.grand_total, // in paise
-        name: 'Supply Setu',
-        order_id: paymentData.gateway_order_id,
-        prefill: {
-          contact: user?.mobile || '',
-          name: user?.full_name || '',
-          email: '',
-        },
-        theme: { color: Colors.primary },
-      };
+      // 4. Verify mock payment instantly to confirm order on backend
+      await api.post('/payments/verify', {
+        razorpay_order_id: paymentData.gateway_order_id,
+        razorpay_payment_id: `pay_mock_${Date.now()}`,
+        razorpay_signature: 'sig_mock_bypass_razorpay',
+      });
 
-      try {
-        const rzpResponse = await RazorpayCheckout.open(options);
-
-        // 5. Verify signature on successful payment on backend
-        await api.post('/payments/verify', {
-          razorpay_order_id: rzpResponse.razorpay_order_id,
-          razorpay_payment_id: rzpResponse.razorpay_payment_id,
-          razorpay_signature: rzpResponse.razorpay_signature,
-        });
-
-        // 6. Clear cart and redirect on success
-        dispatch(clearCart());
-        navigation.replace('OrderConfirmation', { order: orderData });
-      } catch (rzpErr: any) {
-        Alert.alert('Payment Failed', rzpErr.description || 'Payment process was cancelled or failed.');
-      }
+      // 5. Clear cart and redirect on success
+      dispatch(clearCart());
+      navigation.replace('OrderConfirmation', { order: orderData });
     } catch (err: any) {
-      const detail = err.response?.data?.detail || err.message || '';
+      const detail = err.response?.data?.message || err.response?.data?.detail || err.message || '';
       // P5-19 — Credit limit block
       if (err.response?.status === 402) {
         Alert.alert('Credit Limit Exceeded', `${detail}\n\nContact your admin to increase your credit limit.`);
@@ -119,11 +164,19 @@ const CheckoutScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         <Card>
           <Text style={styles.sectionTitle}>📍 Delivery Address</Text>
           <Input label="Address Line" value={address.line1} onChangeText={t => setAddress(a => ({ ...a, line1: t }))} placeholder="Shop No., Street, Area" />
-          <View style={styles.rowInputs}>
-            <Input label="City" value={address.city} onChangeText={t => setAddress(a => ({ ...a, city: t }))} placeholder="Mumbai" style={{ flex: 1 }} />
-            <Input label="State" value={address.state} onChangeText={t => setAddress(a => ({ ...a, state: t }))} placeholder="MH" style={{ flex: 1 }} />
-          </View>
-          <Input label="Pincode" value={address.pincode} onChangeText={t => setAddress(a => ({ ...a, pincode: t.replace(/\D/g, '').slice(0, 6) }))} keyboardType="number-pad" placeholder="400001" />
+          <Input label="City" value={address.city} onChangeText={t => setAddress(a => ({ ...a, city: t }))} placeholder="Mumbai" />
+          
+          <TouchableOpacity 
+            style={[styles.stateDropdownContainer, { marginBottom: Spacing.sm }]}
+            activeOpacity={0.7}
+            onPress={() => setStateModalVisible(true)}>
+            <Text style={styles.stateLabel}>State</Text>
+            <View style={styles.stateDropdown}>
+              <Text style={styles.stateText}>{address.state || 'Select'}</Text>
+              <Text style={styles.stateArrow}>▼</Text>
+            </View>
+          </TouchableOpacity>
+          <Input label="Pincode" value={address.pincode} onChangeText={t => setAddress(a => ({ ...a, pincode: t.replace(/\D/g, '').slice(0, 6) }))} keyboardType="number-pad" placeholder="400001" containerStyle={{ marginTop: Spacing.sm }} />
         </Card>
 
         {/* Coupon */}
@@ -133,7 +186,73 @@ const CheckoutScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <Input label="" value={coupon} onChangeText={setCoupon} placeholder="Enter coupon code" style={{ flex: 1, marginBottom: 0 }} />
             <Button label="Apply" onPress={applyCoupon} fullWidth={false} size="sm" />
           </View>
+
+          {/* Coupon List */}
+          {availableCoupons.length > 0 && (
+            <View style={styles.couponListContainer}>
+              <Text style={styles.couponListTitle}>Available Coupons (Tap to Apply)</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.couponScroll}>
+                {availableCoupons.map((item) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.couponCard}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setCoupon(item.code);
+                      api.post('/cart/apply-coupon', { code: item.code })
+                        .then(({ data }) => {
+                          setDiscount(data.discount_amount || 0);
+                          Alert.alert('Coupon Applied', `Discount: ${formatINR(data.discount_amount)}`);
+                        })
+                        .catch((err) => {
+                          const msg = err.response?.data?.message || err.response?.data?.detail || 'Could not apply coupon';
+                          Alert.alert('Invalid Coupon', msg);
+                        });
+                    }}>
+                    <View style={styles.couponHeader}>
+                      <Text style={styles.couponCodeText}>{item.code}</Text>
+                      <Text style={styles.couponValText}>
+                        {item.discount_type === 'flat' ? `INR ${item.value / 100} Off` : `${item.value}% Off`}
+                      </Text>
+                    </View>
+                    <Text style={styles.couponDescText} numberOfLines={2}>{item.description}</Text>
+                    <Text style={styles.couponMinText}>Min order: {formatINR(item.min_order_value)}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
         </Card>
+
+        {/* State Selection Modal */}
+        <Modal visible={stateModalVisible} animationType="slide" transparent>
+          <SafeAreaView style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select State</Text>
+                <TouchableOpacity onPress={() => setStateModalVisible(false)} style={styles.modalCloseBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Text style={styles.modalCloseText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={INDIAN_STATES}
+                keyExtractor={(item) => item.code}
+                showsVerticalScrollIndicator={false}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.stateOption}
+                    onPress={() => {
+                      setAddress(a => ({ ...a, state: item.code }));
+                      setStateModalVisible(false);
+                    }}>
+                    <Text style={styles.stateOptionText}>{item.name} ({item.code})</Text>
+                  </TouchableOpacity>
+                )}
+                ItemSeparatorComponent={() => <View style={styles.modalDivider} />}
+              />
+            </View>
+          </SafeAreaView>
+        </Modal>
 
         {/* Order Summary */}
         <Card>
@@ -205,6 +324,75 @@ const styles = StyleSheet.create({
   grandValue: { fontSize: Typography.base, fontWeight: '800', color: Colors.primary },
   paymentNote: { backgroundColor: Colors.infoLight, borderRadius: Radius.sm, padding: Spacing.md, marginBottom: Spacing.md },
   paymentNoteText: { fontSize: Typography.sm, color: Colors.info, fontWeight: '600' },
+
+  // State Dropdown Styles
+  stateDropdownContainer: { width: '100%', marginBottom: Spacing.sm },
+  stateLabel: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500', marginBottom: 4 },
+  stateDropdown: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.sm,
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.bgCard,
+  },
+  stateText: { fontSize: 14, color: Colors.textPrimary, fontWeight: '600' },
+  stateArrow: { fontSize: 10, color: Colors.textSecondary },
+
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
+  modalContent: {
+    backgroundColor: Colors.bgPrimary,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    height: '55%',
+    padding: Spacing.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
+  modalCloseBtn: { padding: 4 },
+  modalCloseText: { fontSize: 14, color: Colors.primary, fontWeight: '700' },
+  stateOption: { paddingVertical: 14, paddingHorizontal: Spacing.sm },
+  stateOptionText: { fontSize: 14, color: Colors.textPrimary, fontWeight: '500' },
+  modalDivider: { height: 1, backgroundColor: Colors.border },
+
+  // Coupon List Styles
+  couponListContainer: { marginTop: Spacing.md, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.border },
+  couponListTitle: { fontSize: 12, fontWeight: '700', color: Colors.textSecondary, marginBottom: Spacing.sm },
+  couponScroll: { gap: Spacing.sm, paddingRight: Spacing.md },
+  couponCard: {
+    width: 220,
+    borderWidth: 1.5,
+    borderColor: '#9E7A00',
+    borderRadius: Radius.sm,
+    padding: Spacing.sm + 2,
+    backgroundColor: '#FFFDF0',
+  },
+  couponHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  couponCodeText: { fontSize: 13, fontWeight: '800', color: '#9E7A00', letterSpacing: 0.5 },
+  couponValText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.white,
+    backgroundColor: '#9E7A00',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  couponDescText: { fontSize: 11, color: Colors.textSecondary, marginBottom: 4, lineHeight: 14 },
+  couponMinText: { fontSize: 9, fontWeight: '600', color: Colors.textMuted },
 });
 
 export default CheckoutScreen;
