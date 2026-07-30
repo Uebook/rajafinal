@@ -180,10 +180,20 @@ const Purchases = () => {
     }
   };
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedSupplierFilter, startDateFilter, endDateFilter, searchQuery]);
+
   const filteredPurchases = purchases.filter(p => 
     p.purchaseNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.supplierName.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const totalPages = Math.ceil(filteredPurchases.length / itemsPerPage);
+  const paginatedPurchases = filteredPurchases.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <div>
@@ -268,61 +278,103 @@ const Purchases = () => {
             <p>No purchase entries found. Click "Record New Purchase" to add one.</p>
           </div>
         ) : (
-          <table className="custom-table">
-            <thead>
-              <tr>
-                <th>Purchase Invoice #</th>
-                <th>Supplier Name</th>
-                <th>Invoice Date</th>
-                <th>Total Amount</th>
-                <th>Paid</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredPurchases.map((p) => (
-                <tr key={p.id}>
-                  <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{p.purchaseNumber}</td>
-                  <td>{p.supplierName}</td>
-                  <td style={{ color: 'var(--text-muted)' }}>{new Date(p.invoiceDate).toLocaleDateString()}</td>
-                  <td style={{ fontWeight: 700 }}>₹{p.totalAmount.toLocaleString()}</td>
-                  <td style={{ color: 'var(--secondary)', fontWeight: 600 }}>₹{p.paidAmount.toLocaleString()}</td>
-                  <td>
-                    <span style={{
-                      fontSize: 10,
-                      backgroundColor: p.paymentStatus === 'PAID' ? 'var(--secondary-light)' : p.paymentStatus === 'PARTIAL' ? 'var(--warning-light)' : 'var(--danger-light)',
-                      color: p.paymentStatus === 'PAID' ? 'var(--secondary)' : p.paymentStatus === 'PARTIAL' ? 'var(--primary)' : 'var(--danger)',
-                      padding: '4px 8px',
-                      borderRadius: 4,
-                      fontWeight: 'bold'
-                    }}>
-                      {p.paymentStatus}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button
-                      onClick={() => handleViewDetails(p.id)}
-                      className="btn-icon"
-                      title="View Details"
-                    >
-                      <Eye size={16} />
-                    </button>
-                    {p.paymentStatus !== 'PAID' && (
-                      <button
-                        onClick={() => openRecordPayment(p)}
-                        className="btn-icon"
-                        style={{ color: 'var(--secondary)', marginLeft: 8 }}
-                        title="Record Payment"
-                      >
-                        <DollarSign size={16} />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <>
+            <div className="table-responsive">
+              <table className="custom-table">
+                <thead>
+                  <tr>
+                    <th>Purchase Invoice #</th>
+                    <th>Supplier Name</th>
+                    <th>Invoice Date</th>
+                    <th>Total Amount</th>
+                    <th>Paid</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'right' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedPurchases.map((p) => (
+                    <tr key={p.id}>
+                      <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{p.purchaseNumber}</td>
+                      <td>{p.supplierName}</td>
+                      <td style={{ color: 'var(--text-muted)' }}>{new Date(p.invoiceDate).toLocaleDateString()}</td>
+                      <td style={{ fontWeight: 700 }}>₹{p.totalAmount.toLocaleString()}</td>
+                      <td style={{ color: 'var(--secondary)', fontWeight: 600 }}>₹{p.paidAmount.toLocaleString()}</td>
+                      <td>
+                        <span style={{
+                          fontSize: 10,
+                          backgroundColor: p.paymentStatus === 'PAID' ? 'var(--secondary-light)' : p.paymentStatus === 'PARTIAL' ? 'var(--warning-light)' : 'var(--danger-light)',
+                          color: p.paymentStatus === 'PAID' ? 'var(--secondary)' : p.paymentStatus === 'PARTIAL' ? 'var(--primary)' : 'var(--danger)',
+                          padding: '4px 8px',
+                          borderRadius: 4,
+                          fontWeight: 'bold'
+                        }}>
+                          {p.paymentStatus}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          onClick={() => handleViewDetails(p.id)}
+                          className="btn-icon"
+                          title="View Details"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        {p.paymentStatus !== 'PAID' && (
+                          <button
+                            onClick={() => openRecordPayment(p)}
+                            className="btn-icon"
+                            style={{ color: 'var(--secondary)', marginLeft: 8 }}
+                            title="Record Payment"
+                          >
+                            <DollarSign size={16} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '16px 20px',
+                borderTop: '1px solid var(--border-color)',
+                background: 'var(--bg-secondary)',
+                fontSize: '0.85rem'
+              }}>
+                <span style={{ color: 'var(--text-muted)' }}>
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredPurchases.length)} of {filteredPurchases.length} entries
+                </span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                    className="btn btn-secondary"
+                    style={{ padding: '6px 12px', fontSize: '0.8rem', height: 'auto' }}
+                  >
+                    Previous
+                  </button>
+                  <span style={{ display: 'flex', alignItems: 'center', padding: '0 8px', fontWeight: 600 }}>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    className="btn btn-secondary"
+                    style={{ padding: '6px 12px', fontSize: '0.8rem', height: 'auto' }}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -464,11 +516,28 @@ const Purchases = () => {
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Paid Amount (₹)</label>
+                   <div className="form-group">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <label className="form-label" style={{ margin: 0 }}>Paid Amount (₹)</label>
+                      <label style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        <input
+                          type="checkbox"
+                          checked={purchaseForm.paidAmount === calculateTotal() && calculateTotal() > 0}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setPurchaseForm(prev => ({
+                              ...prev,
+                              paidAmount: checked ? calculateTotal() : 0
+                            }));
+                          }}
+                        />
+                        Full Payment
+                      </label>
+                    </div>
                     <input
                       type="number"
                       min="0"
+                      max={calculateTotal()}
                       value={purchaseForm.paidAmount}
                       onChange={(e) => setPurchaseForm({ ...purchaseForm, paidAmount: Number(e.target.value) })}
                       className="form-input"
@@ -753,7 +822,20 @@ const Purchases = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Payment Amount (₹) *</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <label className="form-label" style={{ margin: 0 }}>Payment Amount (₹) *</label>
+                    <label style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      <input
+                        type="checkbox"
+                        checked={Number(paymentAmount) === (selectedPurchaseForPayment.totalAmount - selectedPurchaseForPayment.paidAmount)}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setPaymentAmount(checked ? (selectedPurchaseForPayment.totalAmount - selectedPurchaseForPayment.paidAmount) : 0);
+                        }}
+                      />
+                      Pay Full Pending
+                    </label>
+                  </div>
                   <input
                     type="number"
                     min="1"

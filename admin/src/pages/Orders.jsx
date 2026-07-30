@@ -332,6 +332,7 @@ const Orders = () => {
         {loading ? (
           <div className="loading-center" style={{ padding: '3rem 0' }}><div className="spinner" /></div>
         ) : (
+        <div className="table-responsive">
           <table className="custom-table">
             <thead>
               <tr>
@@ -422,6 +423,7 @@ const Orders = () => {
               )}
             </tbody>
           </table>
+        </div>
         )}
       </div>
 

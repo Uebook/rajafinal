@@ -237,6 +237,12 @@ body {
   font-size: 0.85rem; width: 100%; font-family: var(--font-sans);
 }
 
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .custom-table { width: 100%; border-collapse: collapse; text-align: left; }
 
 .custom-table th {

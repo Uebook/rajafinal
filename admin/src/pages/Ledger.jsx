@@ -44,6 +44,21 @@ const Ledger = () => {
     available_balance: 0,
   });
 
+  // Pagination states
+  const [pageRetailers, setPageRetailers] = useState(1);
+  const [pageHistory, setPageHistory] = useState(1);
+  const [pageOwn, setPageOwn] = useState(1);
+  const itemsPerPage = 20;
+
+  useEffect(() => {
+    setPageHistory(1);
+    setPageOwn(1);
+  }, [datePreset, selectedMonth, selectedYear, entryTypeFilter, keywordFilter, customStartDate, customEndDate]);
+
+  useEffect(() => {
+    setPageRetailers(1);
+  }, [searchQuery]);
+
   // Filter States for Ledger Detail Page
   const [datePreset, setDatePreset] = useState('all'); // all, week, month, year, custom
   const [selectedMonth, setSelectedMonth] = useState('all');
@@ -358,44 +373,84 @@ const Ledger = () => {
             </button>
           </div>
 
-          <table className="custom-table">
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Amount</th>
-                <th>Reference</th>
-                <th>Description</th>
-                <th>Date & Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredEntries.map(e => (
-                <tr key={e.id}>
-                  <td>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {e.entry_type === 'debit' ? <ArrowUpCircle size={16} color="var(--danger)" /> : <ArrowDownCircle size={16} color="var(--secondary)" />}
-                      <span style={{ fontWeight: 700, color: e.entry_type === 'debit' ? 'var(--danger)' : 'var(--secondary)' }}>
-                        {e.entry_type.toUpperCase()}
-                      </span>
-                    </span>
-                  </td>
-                  <td style={{ fontWeight: 700, fontSize: '0.95rem' }}>{fmt(e.amount)}</td>
-                  <td><span className="badge badge-secondary">{e.reference_type}</span></td>
-                  <td>{e.description || '—'}</td>
-                  <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    {new Date(e.created_at).toLocaleString('en-IN')}
-                  </td>
-                </tr>
-              ))}
-              {filteredEntries.length === 0 && (
+          <div className="table-responsive">
+            <table className="custom-table">
+              <thead>
                 <tr>
-                  <td colSpan="5" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-                    No ledger entries match the selected filters.
-                  </td>
+                  <th>Type</th>
+                  <th>Amount</th>
+                  <th>Reference</th>
+                  <th>Description</th>
+                  <th>Date & Time</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredEntries.slice((pageHistory - 1) * itemsPerPage, pageHistory * itemsPerPage).map(e => (
+                  <tr key={e.id}>
+                    <td>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {e.entry_type === 'debit' ? <ArrowUpCircle size={16} color="var(--danger)" /> : <ArrowDownCircle size={16} color="var(--secondary)" />}
+                        <span style={{ fontWeight: 700, color: e.entry_type === 'debit' ? 'var(--danger)' : 'var(--secondary)' }}>
+                          {e.entry_type.toUpperCase()}
+                        </span>
+                      </span>
+                    </td>
+                    <td style={{ fontWeight: 700, fontSize: '0.95rem' }}>{fmt(e.amount)}</td>
+                    <td><span className="badge badge-secondary">{e.reference_type}</span></td>
+                    <td>{e.description || '—'}</td>
+                    <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      {new Date(e.created_at).toLocaleString('en-IN')}
+                    </td>
+                  </tr>
+                ))}
+                {filteredEntries.length === 0 && (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                      No ledger entries match the selected filters.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Controls */}
+          {Math.ceil(filteredEntries.length / itemsPerPage) > 1 && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 20px',
+              borderTop: '1px solid var(--border-color)',
+              background: 'var(--bg-secondary)',
+              fontSize: '0.85rem'
+            }}>
+              <span style={{ color: 'var(--text-muted)' }}>
+                Showing {((pageHistory - 1) * itemsPerPage) + 1} to {Math.min(pageHistory * itemsPerPage, filteredEntries.length)} of {filteredEntries.length} entries
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  disabled={pageHistory === 1}
+                  onClick={() => setPageHistory(prev => prev - 1)}
+                  className="btn btn-secondary"
+                  style={{ padding: '6px 12px', fontSize: '0.8rem', height: 'auto' }}
+                >
+                  Previous
+                </button>
+                <span style={{ display: 'flex', alignItems: 'center', padding: '0 8px', fontWeight: 600 }}>
+                  Page {pageHistory} of {Math.ceil(filteredEntries.length / itemsPerPage)}
+                </span>
+                <button
+                  disabled={pageHistory === Math.ceil(filteredEntries.length / itemsPerPage)}
+                  onClick={() => setPageHistory(prev => prev + 1)}
+                  className="btn btn-secondary"
+                  style={{ padding: '6px 12px', fontSize: '0.8rem', height: 'auto' }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -440,57 +495,97 @@ const Ledger = () => {
             </div>
           </div>
 
-          <table className="custom-table">
-            <thead>
-              <tr>
-                <th>Business Name</th>
-                <th>Owner Name</th>
-                <th>Contact</th>
-                <th>Credit Limit</th>
-                <th>Used (Outstanding)</th>
-                <th>Available Credit</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRetailers.map(r => {
-                const rp = r.retailer_profile || {};
-                const creditLimit = rp.credit_limit || 0;
-                const usedLimit = rp.used_limit || 0;
-                const availableLimit = rp.available_limit || 0;
-                return (
-                  <tr key={r.id}>
-                    <td style={{ fontWeight: 700 }}>{rp.business_name || 'N/A'}</td>
-                    <td style={{ fontWeight: 600 }}>{rp.owner_name || r.full_name}</td>
-                    <td>{r.mobile}</td>
-                    <td style={{ fontWeight: 600 }}>{fmt(creditLimit)}</td>
-                    <td style={{ color: usedLimit > 0 ? 'var(--danger)' : 'var(--text-primary)', fontWeight: 700 }}>
-                      {fmt(usedLimit)}
-                    </td>
-                    <td style={{ color: 'var(--success)', fontWeight: 700 }}>
-                      {fmt(availableLimit)}
-                    </td>
-                    <td>
-                      <button 
-                        className="btn btn-primary btn-sm" 
-                        onClick={() => handleSelectRetailer(r)} 
-                        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                      >
-                        <Eye size={14} /> Full History Page
-                      </button>
+          <div className="table-responsive">
+            <table className="custom-table">
+              <thead>
+                <tr>
+                  <th>Business Name</th>
+                  <th>Owner Name</th>
+                  <th>Contact</th>
+                  <th>Credit Limit</th>
+                  <th>Used (Outstanding)</th>
+                  <th>Available Credit</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRetailers.slice((pageRetailers - 1) * itemsPerPage, pageRetailers * itemsPerPage).map(r => {
+                  const rp = r.retailer_profile || {};
+                  const creditLimit = rp.credit_limit || 0;
+                  const usedLimit = rp.used_limit || 0;
+                  const availableLimit = rp.available_limit || 0;
+                  return (
+                    <tr key={r.id}>
+                      <td style={{ fontWeight: 700 }}>{rp.business_name || 'N/A'}</td>
+                      <td style={{ fontWeight: 600 }}>{rp.owner_name || r.full_name}</td>
+                      <td>{r.mobile}</td>
+                      <td style={{ fontWeight: 600 }}>{fmt(creditLimit)}</td>
+                      <td style={{ color: usedLimit > 0 ? 'var(--danger)' : 'var(--text-primary)', fontWeight: 700 }}>
+                        {fmt(usedLimit)}
+                      </td>
+                      <td style={{ color: 'var(--success)', fontWeight: 700 }}>
+                        {fmt(availableLimit)}
+                      </td>
+                      <td>
+                        <button 
+                          className="btn btn-primary btn-sm" 
+                          onClick={() => handleSelectRetailer(r)} 
+                          style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                        >
+                          <Eye size={14} /> Full History Page
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredRetailers.length === 0 && (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                      No retailers found
                     </td>
                   </tr>
-                );
-              })}
-              {filteredRetailers.length === 0 && (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-                    No retailers found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Controls */}
+          {Math.ceil(filteredRetailers.length / itemsPerPage) > 1 && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 20px',
+              borderTop: '1px solid var(--border-color)',
+              background: 'var(--bg-secondary)',
+              fontSize: '0.85rem'
+            }}>
+              <span style={{ color: 'var(--text-muted)' }}>
+                Showing {((pageRetailers - 1) * itemsPerPage) + 1} to {Math.min(pageRetailers * itemsPerPage, filteredRetailers.length)} of {filteredRetailers.length} entries
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  disabled={pageRetailers === 1}
+                  onClick={() => setPageRetailers(prev => prev - 1)}
+                  className="btn btn-secondary"
+                  style={{ padding: '6px 12px', fontSize: '0.8rem', height: 'auto' }}
+                >
+                  Previous
+                </button>
+                <span style={{ display: 'flex', alignItems: 'center', padding: '0 8px', fontWeight: 600 }}>
+                  Page {pageRetailers} of {Math.ceil(filteredRetailers.length / itemsPerPage)}
+                </span>
+                <button
+                  disabled={pageRetailers === Math.ceil(filteredRetailers.length / itemsPerPage)}
+                  onClick={() => setPageRetailers(prev => prev + 1)}
+                  className="btn btn-secondary"
+                  style={{ padding: '6px 12px', fontSize: '0.8rem', height: 'auto' }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -524,42 +619,82 @@ const Ledger = () => {
       </div>
 
       <div className="table-container">
-        <table className="custom-table">
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Amount</th>
-              <th>Reference</th>
-              <th>Description</th>
-              <th>Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ownEntries.map(e => (
-              <tr key={e.id}>
-                <td>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {e.entry_type === 'debit' ? <ArrowUpCircle size={16} color="var(--danger)" /> : <ArrowDownCircle size={16} color="var(--secondary)" />}
-                    <span style={{ fontWeight: 700, color: e.entry_type === 'debit' ? 'var(--danger)' : 'var(--secondary)' }}>
-                      {e.entry_type.toUpperCase()}
-                    </span>
-                  </span>
-                </td>
-                <td style={{ fontWeight: 700 }}>{fmt(e.amount)}</td>
-                <td>{e.reference_type}</td>
-                <td>{e.description || '—'}</td>
-                <td style={{ color: 'var(--text-muted)' }}>{new Date(e.created_at).toLocaleDateString()}</td>
-              </tr>
-            ))}
-            {ownEntries.length === 0 && (
+        <div className="table-responsive">
+          <table className="custom-table">
+            <thead>
               <tr>
-                <td colSpan="5" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-                  No ledger entries recorded yet.
-                </td>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Reference</th>
+                <th>Description</th>
+                <th>Date</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {ownEntries.slice((pageOwn - 1) * itemsPerPage, pageOwn * itemsPerPage).map(e => (
+                <tr key={e.id}>
+                  <td>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {e.entry_type === 'debit' ? <ArrowUpCircle size={16} color="var(--danger)" /> : <ArrowDownCircle size={16} color="var(--secondary)" />}
+                      <span style={{ fontWeight: 700, color: e.entry_type === 'debit' ? 'var(--danger)' : 'var(--secondary)' }}>
+                        {e.entry_type.toUpperCase()}
+                      </span>
+                    </span>
+                  </td>
+                  <td style={{ fontWeight: 700 }}>{fmt(e.amount)}</td>
+                  <td>{e.reference_type}</td>
+                  <td>{e.description || '—'}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>{new Date(e.created_at).toLocaleDateString()}</td>
+                </tr>
+              ))}
+              {ownEntries.length === 0 && (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                    No ledger entries recorded yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Controls */}
+        {Math.ceil(ownEntries.length / itemsPerPage) > 1 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '16px 20px',
+            borderTop: '1px solid var(--border-color)',
+            background: 'var(--bg-secondary)',
+            fontSize: '0.85rem'
+          }}>
+            <span style={{ color: 'var(--text-muted)' }}>
+              Showing {((pageOwn - 1) * itemsPerPage) + 1} to {Math.min(pageOwn * itemsPerPage, ownEntries.length)} of {ownEntries.length} entries
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                disabled={pageOwn === 1}
+                onClick={() => setPageOwn(prev => prev - 1)}
+                className="btn btn-secondary"
+                style={{ padding: '6px 12px', fontSize: '0.8rem', height: 'auto' }}
+              >
+                Previous
+              </button>
+              <span style={{ display: 'flex', alignItems: 'center', padding: '0 8px', fontWeight: 600 }}>
+                Page {pageOwn} of {Math.ceil(ownEntries.length / itemsPerPage)}
+              </span>
+              <button
+                disabled={pageOwn === Math.ceil(ownEntries.length / itemsPerPage)}
+                onClick={() => setPageOwn(prev => prev + 1)}
+                className="btn btn-secondary"
+                style={{ padding: '6px 12px', fontSize: '0.8rem', height: 'auto' }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

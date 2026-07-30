@@ -10,6 +10,12 @@ const Products = () => {
   const [catFilter, setCatFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, catFilter]);
   const [form, setForm] = useState({
     name: '',
     sku: '',
@@ -153,6 +159,9 @@ const Products = () => {
   const rootCategories = categories.filter(c => !c.parent_id);
   const subCategories = categories.filter(c => c.parent_id === form.category_id);
 
+  const totalPages = Math.ceil(products.length / itemsPerPage);
+  const paginatedProducts = products.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   if (loading) return <div className="loading-center"><div className="spinner" /></div>;
 
   return (
@@ -194,88 +203,128 @@ const Products = () => {
           </div>
         </div>
 
-        <table className="custom-table">
-          <thead>
-            <tr>
-              <th>Product</th>
-              <th>SKU</th>
-              <th>Category</th>
-              <th>Base Price</th>
-              <th>Vendor Price</th>
-              <th>Retailer Price</th>
-              <th>GST</th>
-              <th>Stock</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map(p => (
-              <tr key={p.id}>
-                <td style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {p.images && p.images.length > 0 ? (
-                    <img
-                      src={p.images[0].image_url}
-                      alt={p.name}
-                      style={{ width: 36, height: 36, borderRadius: 4, objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <div style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 4,
-                      backgroundColor: 'var(--bg-secondary)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 10,
-                      color: 'var(--text-muted)',
-                      fontWeight: 'bold'
-                    }}>
-                      N/A
-                    </div>
-                  )}
-                  <div>
-                    <div style={{ fontWeight: 700 }}>{p.name}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                      {p.return_policy} ({p.return_window_days || 0}d window)
-                    </div>
-                  </div>
-                </td>
-                <td>{p.sku}</td>
-                <td>
-                  {categories.find(c => c.id === p.category_id)?.name || '—'}
-                  {p.sub_category_id && ` └─ ${categories.find(c => c.id === p.sub_category_id)?.name || ''}`}
-                </td>
-                <td>{fmt(p.base_price)}</td>
-                <td>{p.vendor_price ? fmt(p.vendor_price) : '—'}</td>
-                <td>{p.retailer_price ? fmt(p.retailer_price) : '—'}</td>
-                <td>{p.gst_rate}%</td>
-                <td>
-                  <span className={`badge ${p.stock_qty <= 0 ? 'danger' : p.stock_qty <= p.low_stock_threshold ? 'warning' : 'active'}`}>
-                    {p.stock_qty}
-                  </span>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button className="btn-icon edit-btn" onClick={() => openEdit(p)}>
-                      <Edit size={14} />
-                    </button>
-                    <button className="btn-icon delete-btn" onClick={() => handleDelete(p.id)}>
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {products.length === 0 && (
+        <div className="table-responsive">
+          <table className="custom-table">
+            <thead>
               <tr>
-                <td colSpan="9" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-                  No products found
-                </td>
+                <th>Product</th>
+                <th>SKU</th>
+                <th>Category</th>
+                <th>Base Price</th>
+                <th>Vendor Price</th>
+                <th>Retailer Price</th>
+                <th>GST</th>
+                <th>Stock</th>
+                <th>Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {paginatedProducts.map(p => (
+                <tr key={p.id}>
+                  <td style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {p.images && p.images.length > 0 ? (
+                      <img
+                        src={p.images[0].image_url}
+                        alt={p.name}
+                        style={{ width: 36, height: 36, borderRadius: 4, objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 4,
+                        backgroundColor: 'var(--bg-secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 10,
+                        color: 'var(--text-muted)',
+                        fontWeight: 'bold'
+                      }}>
+                        N/A
+                      </div>
+                    )}
+                    <div>
+                      <div style={{ fontWeight: 700 }}>{p.name}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                        {p.return_policy} ({p.return_window_days || 0}d window)
+                      </div>
+                    </div>
+                  </td>
+                  <td>{p.sku}</td>
+                  <td>
+                    {categories.find(c => c.id === p.category_id)?.name || '—'}
+                    {p.sub_category_id && ` └─ ${categories.find(c => c.id === p.sub_category_id)?.name || ''}`}
+                  </td>
+                  <td>{fmt(p.base_price)}</td>
+                  <td>{p.vendor_price ? fmt(p.vendor_price) : '—'}</td>
+                  <td>{p.retailer_price ? fmt(p.retailer_price) : '—'}</td>
+                  <td>{p.gst_rate}%</td>
+                  <td>
+                    <span className={`badge ${p.stock_qty <= 0 ? 'danger' : p.stock_qty <= p.low_stock_threshold ? 'warning' : 'active'}`}>
+                      {p.stock_qty}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn-icon edit-btn" onClick={() => openEdit(p)}>
+                        <Edit size={14} />
+                      </button>
+                      <button className="btn-icon delete-btn" onClick={() => handleDelete(p.id)}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {products.length === 0 && (
+                <tr>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                    No products found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '16px 20px',
+            borderTop: '1px solid var(--border-color)',
+            background: 'var(--bg-secondary)',
+            fontSize: '0.85rem'
+          }}>
+            <span style={{ color: 'var(--text-muted)' }}>
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, products.length)} of {products.length} entries
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => prev - 1)}
+                className="btn btn-secondary"
+                style={{ padding: '6px 12px', fontSize: '0.8rem', height: 'auto' }}
+              >
+                Previous
+              </button>
+              <span style={{ display: 'flex', alignItems: 'center', padding: '0 8px', fontWeight: 600 }}>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                className="btn btn-secondary"
+                style={{ padding: '6px 12px', fontSize: '0.8rem', height: 'auto' }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {showModal && (

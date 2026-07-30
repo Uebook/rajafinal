@@ -8,6 +8,12 @@ const Categories = () => {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
   const [form, setForm] = useState({
     name: '',
     description: '',
@@ -133,6 +139,8 @@ const Categories = () => {
   );
 
   const orderedCategories = buildOrderedCategories(filteredCategories);
+  const totalPages = Math.ceil(orderedCategories.length / itemsPerPage);
+  const paginatedCategories = orderedCategories.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   if (loading) return <div className="loading-center"><div className="spinner" /></div>;
 
@@ -161,82 +169,48 @@ const Categories = () => {
           </div>
         </div>
 
-        <table className="custom-table">
-          <thead>
-            <tr>
-              <th>Image</th>
-              <th>Category Name</th>
-              <th>Type</th>
-              <th>Description</th>
-              <th>Visibility</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orderedCategories.map(c => (
-              <tr key={c.id}>
-                <td>
-                  {c.image_url ? (
-                    <img
-                      src={c.image_url}
-                      alt={c.name}
-                      style={{ width: 36, height: 36, borderRadius: 4, objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <div style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 4,
-                      backgroundColor: 'var(--bg-secondary)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 10,
-                      color: 'var(--text-muted)',
-                      fontWeight: 'bold'
-                    }}>
-                      N/A
+        <div className="table-responsive">
+          <table className="custom-table">
+            <thead>
+              <tr>
+                <th>Image</th>
+                <th>Category Name</th>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Visibility</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedCategories.map(c => (
+                <tr key={c.id}>
+                  <td>
+                    {c.image_url ? (
+                      <img src={c.image_url} alt={c.name} style={{ width: 40, height: 40, borderRadius: 'var(--radius-sm)', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-sm)', background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'var(--text-muted)' }}>No Image</div>
+                    )}
+                  </td>
+                  <td>
+                    <div style={{ paddingLeft: c.parent_id ? 20 : 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {c.parent_id && <span style={{ color: 'var(--text-muted)' }}>↳</span>}
+                      <span style={{ fontWeight: c.parent_id ? 500 : 700 }}>{c.name}</span>
                     </div>
-                  )}
-                </td>
-                <td style={{ 
-                  fontWeight: 700,
-                  paddingLeft: c.parent_id ? (c.depth ? c.depth * 24 + 12 : 24) : 12,
-                  color: c.parent_id ? 'var(--text-muted)' : 'var(--text-primary)'
-                }}>
-                  {c.parent_id && <span style={{ color: 'var(--text-muted)', marginRight: 6 }}>└─</span>}
-                  {c.name}
-                </td>
-                <td>
-                  {c.parent_id ? (
-                    <span style={{
-                      fontSize: 10,
-                      backgroundColor: '#E8F5E9',
-                      color: '#1B5E20',
-                      padding: '2px 6px',
-                      borderRadius: 4,
-                      fontWeight: 'bold'
-                    }}>
-                      Sub-category
-                    </span>
-                  ) : (
-                    <span style={{
-                      fontSize: 10,
-                      backgroundColor: '#E3F2FD',
-                      color: '#0D47A1',
-                      padding: '2px 6px',
-                      borderRadius: 4,
-                      fontWeight: 'bold'
-                    }}>
-                      Parent
-                    </span>
-                  )}
-                </td>
-                <td>{c.description || '—'}</td>
-                <td>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {c.visible_to_vendor && (
+                  </td>
+                  <td>
+                    {c.parent_id ? (
+                      <span style={{
+                        fontSize: 10,
+                        backgroundColor: '#FFF3E0',
+                        color: '#E65100',
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        fontWeight: 'bold'
+                      }}>
+                        Subcategory
+                      </span>
+                    ) : (
                       <span style={{
                         fontSize: 10,
                         backgroundColor: '#E3F2FD',
@@ -245,49 +219,104 @@ const Categories = () => {
                         borderRadius: 4,
                         fontWeight: 'bold'
                       }}>
-                        Vendor
+                        Parent
                       </span>
                     )}
-                    {c.visible_to_retailer && (
-                      <span style={{
-                        fontSize: 10,
-                        backgroundColor: '#E8F5E9',
-                        color: '#1B5E20',
-                        padding: '2px 6px',
-                        borderRadius: 4,
-                        fontWeight: 'bold'
-                      }}>
-                        Retailer
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td>
-                  <span className={`badge ${c.is_active ? 'active' : 'inactive'}`}>
-                    {c.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button className="btn-icon edit-btn" onClick={() => openEdit(c)}>
-                      <Edit size={14} />
-                    </button>
-                    <button className="btn-icon delete-btn" onClick={() => handleDelete(c.id)}>
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {orderedCategories.length === 0 && (
-              <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-                  No categories found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                  </td>
+                  <td>{c.description || '—'}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {c.visible_to_vendor && (
+                        <span style={{
+                          fontSize: 10,
+                          backgroundColor: '#E3F2FD',
+                          color: '#0D47A1',
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          fontWeight: 'bold'
+                        }}>
+                          Vendor
+                        </span>
+                      )}
+                      {c.visible_to_retailer && (
+                        <span style={{
+                          fontSize: 10,
+                          backgroundColor: '#E8F5E9',
+                          color: '#1B5E20',
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          fontWeight: 'bold'
+                        }}>
+                          Retailer
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`badge ${c.is_active ? 'active' : 'inactive'}`}>
+                      {c.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn-icon edit-btn" onClick={() => openEdit(c)}>
+                        <Edit size={14} />
+                      </button>
+                      <button className="btn-icon delete-btn" onClick={() => handleDelete(c.id)}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {orderedCategories.length === 0 && (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                    No categories found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '16px 20px',
+            borderTop: '1px solid var(--border-color)',
+            background: 'var(--bg-secondary)',
+            fontSize: '0.85rem'
+          }}>
+            <span style={{ color: 'var(--text-muted)' }}>
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, orderedCategories.length)} of {orderedCategories.length} entries
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => prev - 1)}
+                className="btn btn-secondary"
+                style={{ padding: '6px 12px', fontSize: '0.8rem', height: 'auto' }}
+              >
+                Previous
+              </button>
+              <span style={{ display: 'flex', alignItems: 'center', padding: '0 8px', fontWeight: 600 }}>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                className="btn btn-secondary"
+                style={{ padding: '6px 12px', fontSize: '0.8rem', height: 'auto' }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {showModal && (

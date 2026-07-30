@@ -13,6 +13,14 @@ const TallyLedger = () => {
   const [endDate, setEndDate] = useState('');
   const [voucherTypeFilter, setVoucherTypeFilter] = useState('ALL');
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  // reset page on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [startDate, endDate, voucherTypeFilter]);
+
   const fetchDaybook = async () => {
     setLoading(true);
     try {
@@ -46,6 +54,9 @@ const TallyLedger = () => {
     }
     return acc;
   }, { debit: 0, credit: 0 });
+
+  const totalPages = Math.ceil(filteredVouchers.length / itemsPerPage);
+  const paginatedVouchers = filteredVouchers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <div>
@@ -148,68 +159,110 @@ const TallyLedger = () => {
             No accounting vouchers found for the selected criteria.
           </div>
         ) : (
-          <table className="custom-table">
-            <thead>
-              <tr>
-                <th>Date & Time</th>
-                <th>Voucher Type</th>
-                <th>Debit Account</th>
-                <th>Credit Account</th>
-                <th>Supplier / Buyer</th>
-                <th>Description / Particulars</th>
-                <th style={{ textAlign: 'right' }}>Debit Amount</th>
-                <th style={{ textAlign: 'right' }}>Credit Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredVouchers.map((v) => (
-                <tr key={v.id}>
-                  <td style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                    {new Date(v.createdAt).toLocaleString()}
-                  </td>
-                  <td>
-                    <span style={{
-                      fontSize: 10,
-                      backgroundColor:
-                        v.voucherType === 'PURCHASE' ? 'var(--warning-light)' :
-                        v.voucherType === 'SALES' ? 'var(--primary-light)' :
-                        v.voucherType === 'PAYMENT' ? 'var(--danger-light)' :
-                        'var(--secondary-light)',
-                      color:
-                        v.voucherType === 'PURCHASE' ? 'var(--warning)' :
-                        v.voucherType === 'SALES' ? 'var(--primary)' :
-                        v.voucherType === 'PAYMENT' ? 'var(--danger)' :
-                        'var(--secondary)',
-                      padding: '4px 8px',
-                      borderRadius: 4,
-                      fontWeight: 'bold'
-                    }}>
-                      {v.voucherType || 'GENERAL'}
-                    </span>
-                  </td>
-                  <td style={{ fontWeight: 600 }}>{v.debitAccount || '—'}</td>
-                  <td style={{ fontWeight: 600 }}>{v.creditAccount || '—'}</td>
-                  <td>
-                    {v.partyName !== '—' ? (
-                      <div>
-                        <strong style={{ display: 'block' }}>{v.partyName}</strong>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{v.partyType}</span>
-                      </div>
-                    ) : (
-                      <span style={{ color: 'var(--text-muted)' }}>—</span>
-                    )}
-                  </td>
-                  <td style={{ color: 'var(--text-secondary)', maxW: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={v.description}>{v.description}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger)' }}>
-                    {v.entryType === 'DEBIT' ? `₹${v.amount.toLocaleString()}` : '—'}
-                  </td>
-                  <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--secondary)' }}>
-                    {v.entryType === 'CREDIT' ? `₹${v.amount.toLocaleString()}` : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <>
+            <div className="table-responsive">
+              <table className="custom-table">
+                <thead>
+                  <tr>
+                    <th>Date & Time</th>
+                    <th>Voucher Type</th>
+                    <th>Debit Account</th>
+                    <th>Credit Account</th>
+                    <th>Supplier / Buyer</th>
+                    <th>Description / Particulars</th>
+                    <th style={{ textAlign: 'right' }}>Debit Amount</th>
+                    <th style={{ textAlign: 'right' }}>Credit Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedVouchers.map((v) => (
+                    <tr key={v.id}>
+                      <td style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                        {new Date(v.createdAt).toLocaleString()}
+                      </td>
+                      <td>
+                        <span style={{
+                          fontSize: 10,
+                          backgroundColor:
+                            v.voucherType === 'PURCHASE' ? 'var(--warning-light)' :
+                            v.voucherType === 'SALES' ? 'var(--primary-light)' :
+                            v.voucherType === 'PAYMENT' ? 'var(--danger-light)' :
+                            'var(--secondary-light)',
+                          color:
+                            v.voucherType === 'PURCHASE' ? 'var(--warning)' :
+                            v.voucherType === 'SALES' ? 'var(--primary)' :
+                            v.voucherType === 'PAYMENT' ? 'var(--danger)' :
+                            'var(--secondary)',
+                          padding: '4px 8px',
+                          borderRadius: 4,
+                          fontWeight: 'bold'
+                        }}>
+                          {v.voucherType || 'GENERAL'}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{v.debitAccount || '—'}</td>
+                      <td style={{ fontWeight: 600 }}>{v.creditAccount || '—'}</td>
+                      <td>
+                        {v.partyName !== '—' ? (
+                          <div>
+                            <strong style={{ display: 'block' }}>{v.partyName}</strong>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{v.partyType}</span>
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ color: 'var(--text-secondary)', maxW: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={v.description}>{v.description}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger)' }}>
+                        {v.entryType === 'DEBIT' ? `₹${v.amount.toLocaleString()}` : '—'}
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--secondary)' }}>
+                        {v.entryType === 'CREDIT' ? `₹${v.amount.toLocaleString()}` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '16px 20px',
+                borderTop: '1px solid var(--border-color)',
+                background: 'var(--bg-secondary)',
+                fontSize: '0.85rem'
+              }}>
+                <span style={{ color: 'var(--text-muted)' }}>
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredVouchers.length)} of {filteredVouchers.length} entries
+                </span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                    className="btn btn-secondary"
+                    style={{ padding: '6px 12px', fontSize: '0.8rem', height: 'auto' }}
+                  >
+                    Previous
+                  </button>
+                  <span style={{ display: 'flex', alignItems: 'center', padding: '0 8px', fontWeight: 600 }}>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    className="btn btn-secondary"
+                    style={{ padding: '6px 12px', fontSize: '0.8rem', height: 'auto' }}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
