@@ -23,12 +23,22 @@ const appName = process.env.APP_NAME || 'AMB-DMP-2026-NODE';
 const appEnv = process.env.APP_ENV || 'development';
 const apiPrefix = process.env.API_V1_PREFIX || '/api/v1';
 
-app.use(cors({
-  origin: (origin, callback) => {
-    callback(null, origin || true);
-  },
-  credentials: true,
-}));
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
 
 app.use(express.json());
 
