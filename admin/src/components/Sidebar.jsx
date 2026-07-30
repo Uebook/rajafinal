@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Package, ShoppingCart, Users, BookOpen,
   Warehouse, Tag, BarChart3, Shield, Settings, LogOut, Sun, Moon,
-  Zap, FolderOpen, FileText, Bell, ShoppingBag, BookMarked
+  Zap, FolderOpen, FileText, Bell, ShoppingBag, BookMarked, X
 } from 'lucide-react';
 
 const menuItems = [
