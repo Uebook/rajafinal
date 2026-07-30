@@ -13,14 +13,14 @@ if (!connectionString) {
 
 const poolSize = process.env.DB_POOL_SIZE ? parseInt(process.env.DB_POOL_SIZE, 10) : 20;
 
-const isRender = connectionString.includes('render.com');
+const isSSL = connectionString.includes('sslmode=require') || connectionString.includes('.render.com') || connectionString.includes('neon.tech') || connectionString.includes('supabase') || connectionString.includes('aiven');
 
 export const pool = new pg.Pool({
   connectionString,
   max: poolSize,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 15000,
-  ssl: isRender ? { rejectUnauthorized: false } : undefined,
+  ssl: isSSL ? { rejectUnauthorized: false } : { rejectUnauthorized: false },
 });
 
 export const db = drizzle(pool, { schema });
