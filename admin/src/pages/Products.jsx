@@ -156,8 +156,8 @@ const Products = () => {
 
   const fmt = (paise) => `INR ${(paise / 100).toFixed(2)}`;
 
-  const rootCategories = categories.filter(c => !c.parent_id);
-  const subCategories = categories.filter(c => String(c.parent_id) === String(form.category_id));
+  const rootCategories = categories.filter(c => !c.parent_id || c.parent_id === null || c.parent_id === '');
+  const subCategories = categories.filter(c => c.parent_id && String(c.parent_id) === String(form.category_id));
 
   const totalPages = Math.ceil(products.length / itemsPerPage);
   const paginatedProducts = products.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -404,7 +404,7 @@ const Products = () => {
                       required
                     >
                       <option value="">Select category</option>
-                      {rootCategories.map(c => (
+                      {categories.filter(c => !c.parent_id).map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
