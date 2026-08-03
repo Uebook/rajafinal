@@ -162,7 +162,9 @@ export class ProductService {
     }
 
     let depth = cat.depth;
-    const newParentId = data.parentId !== undefined ? data.parentId : cat.parentId;
+    const parentIdVal = data.parentId !== undefined ? data.parentId : (data.parent_id !== undefined ? data.parent_id : cat.parentId);
+    const newParentId = parentIdVal && parentIdVal !== '' ? parentIdVal : null;
+    
     if (newParentId) {
       const [parent] = await db
         .select()
@@ -175,17 +177,22 @@ export class ProductService {
       depth = 0;
     }
 
+    const imageUrlVal = data.imageUrl !== undefined ? data.imageUrl : (data.image_url !== undefined ? data.image_url : cat.imageUrl);
+    const visibleToVendorVal = data.visibleToVendor !== undefined ? data.visibleToVendor : (data.visible_to_vendor !== undefined ? data.visible_to_vendor : cat.visibleToVendor);
+    const visibleToRetailerVal = data.visibleToRetailer !== undefined ? data.visibleToRetailer : (data.visible_to_retailer !== undefined ? data.visible_to_retailer : cat.visibleToRetailer);
+    const isActiveVal = data.isActive !== undefined ? data.isActive : (data.is_active !== undefined ? data.is_active : cat.isActive);
+
     const [updated] = await db
       .update(categories)
       .set({
         name: data.name !== undefined ? data.name : cat.name,
         description: data.description !== undefined ? data.description : cat.description,
-        imageUrl: data.imageUrl !== undefined ? data.imageUrl : cat.imageUrl,
+        imageUrl: imageUrlVal,
         parentId: newParentId,
         depth: depth,
-        visibleToVendor: data.visibleToVendor !== undefined ? data.visibleToVendor : cat.visibleToVendor,
-        visibleToRetailer: data.visibleToRetailer !== undefined ? data.visibleToRetailer : cat.visibleToRetailer,
-        isActive: data.isActive !== undefined ? data.isActive : cat.isActive,
+        visibleToVendor: visibleToVendorVal,
+        visibleToRetailer: visibleToRetailerVal,
+        isActive: isActiveVal,
         updatedAt: new Date(),
       })
       .where(eq(categories.id, id))

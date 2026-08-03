@@ -66,10 +66,15 @@ const categorySchema = z.object({
   name: z.string().min(1, 'Category name is required'),
   description: z.string().optional(),
   imageUrl: z.string().optional(),
+  image_url: z.string().optional(),
   parentId: z.string().nullable().optional(),
+  parent_id: z.string().nullable().optional(),
   visibleToVendor: z.boolean().optional(),
+  visible_to_vendor: z.boolean().optional(),
   visibleToRetailer: z.boolean().optional(),
+  visible_to_retailer: z.boolean().optional(),
   isActive: z.boolean().optional(),
+  is_active: z.boolean().optional(),
 });
 
 const productSchema = z.object({
