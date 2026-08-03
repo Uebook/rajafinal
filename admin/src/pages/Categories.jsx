@@ -88,8 +88,10 @@ const Categories = () => {
     try {
       if (editItem) {
         await api.patch(`/categories/${editItem.id}`, payload);
+        alert('Category updated successfully!');
       } else {
         await api.post('/categories', payload);
+        alert('Category created successfully!');
       }
       setShowModal(false);
       load();

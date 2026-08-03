@@ -161,13 +161,28 @@ export class ProductService {
       throw new AppError(404, 'Category not found', 'NOT_FOUND');
     }
 
+    let depth = cat.depth;
+    const newParentId = data.parentId !== undefined ? data.parentId : cat.parentId;
+    if (newParentId) {
+      const [parent] = await db
+        .select()
+        .from(categories)
+        .where(and(eq(categories.id, newParentId), eq(categories.isDeleted, false)));
+      if (parent) {
+        depth = parent.depth + 1;
+      }
+    } else {
+      depth = 0;
+    }
+
     const [updated] = await db
       .update(categories)
       .set({
         name: data.name !== undefined ? data.name : cat.name,
         description: data.description !== undefined ? data.description : cat.description,
         imageUrl: data.imageUrl !== undefined ? data.imageUrl : cat.imageUrl,
-        parentId: data.parentId !== undefined ? data.parentId : cat.parentId,
+        parentId: newParentId,
+        depth: depth,
         visibleToVendor: data.visibleToVendor !== undefined ? data.visibleToVendor : cat.visibleToVendor,
         visibleToRetailer: data.visibleToRetailer !== undefined ? data.visibleToRetailer : cat.visibleToRetailer,
         isActive: data.isActive !== undefined ? data.isActive : cat.isActive,
