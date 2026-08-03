@@ -141,6 +141,7 @@ export class ProductService {
         name: data.name !== undefined ? data.name : cat.name,
         description: data.description !== undefined ? data.description : cat.description,
         imageUrl: data.imageUrl !== undefined ? data.imageUrl : cat.imageUrl,
+        parentId: data.parentId !== undefined ? data.parentId : cat.parentId,
         visibleToVendor: data.visibleToVendor !== undefined ? data.visibleToVendor : cat.visibleToVendor,
         visibleToRetailer: data.visibleToRetailer !== undefined ? data.visibleToRetailer : cat.visibleToRetailer,
         isActive: data.isActive !== undefined ? data.isActive : cat.isActive,
