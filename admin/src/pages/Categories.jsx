@@ -375,7 +375,7 @@ const Categories = () => {
                     onChange={e => setForm({ ...form, parent_id: e.target.value })}
                   >
                     <option value="">None (Top-level category)</option>
-                    {categories.filter(c => !c.parent_id && (!editItem || c.id !== editItem.id)).map(parent => (
+                    {categories.filter(c => !editItem || String(c.id) !== String(editItem.id)).map(parent => (
                       <option key={parent.id} value={parent.id}>
                         {parent.name}
                       </option>
