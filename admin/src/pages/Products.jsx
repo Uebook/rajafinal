@@ -157,7 +157,7 @@ const Products = () => {
   const fmt = (paise) => `INR ${(paise / 100).toFixed(2)}`;
 
   const rootCategories = categories.filter(c => !c.parent_id);
-  const subCategories = categories.filter(c => c.parent_id === form.category_id);
+  const subCategories = categories.filter(c => String(c.parent_id) === String(form.category_id));
 
   const totalPages = Math.ceil(products.length / itemsPerPage);
   const paginatedProducts = products.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -431,13 +431,20 @@ const Products = () => {
                   </div>
                   <div className="form-group">
                     <label className="form-label">Unit</label>
-                    <input
-                      className="form-input"
+                    <select
+                      className="form-select"
                       value={form.unit}
                       onChange={e => setForm({ ...form, unit: e.target.value })}
-                      placeholder="piece"
                       required
-                    />
+                    >
+                      <option value="pcs">pcs</option>
+                      <option value="kg">kg</option>
+                      <option value="gm">gm</option>
+                      <option value="kg / gm">kg / gm</option>
+                      <option value="box">box</option>
+                      <option value="packet">packet</option>
+                      <option value="liter">liter</option>
+                    </select>
                   </div>
                 </div>
 

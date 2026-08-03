@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import {
   IndianRupee, ShoppingCart, Users, Package, Clock, TrendingUp,
-  AlertCircle, ArrowUpRight, RefreshCw
+  AlertCircle, ArrowUpRight, RefreshCw, Calendar
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
@@ -29,7 +29,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const Dashboard = () => {
-  const [kpis, setKpis] = useState({ total_orders: 0, total_revenue: 0, active_vendors: 0, active_retailers: 0 });
+  const [kpis, setKpis] = useState({ total_orders: 0, total_revenue: 0, active_vendors: 0, active_retailers: 0, total_liability: 0, total_debt: 0, total_stock_value: 0, total_stock_qty: 0 });
   const [recentOrders, setRecentOrders] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [salesReport, setSalesReport] = useState(null);
@@ -37,10 +37,14 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
+  // Date filters state
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
   const load = async () => {
     try {
       const [dashRes, ordersRes, logsRes, salesRes] = await Promise.all([
-        api.get('/admin/reports/dashboard'),
+        api.get('/admin/reports/dashboard', { params: { start_date: startDate || undefined, end_date: endDate || undefined } }),
         api.get('/orders?page_size=8'),
         api.get('/admin/audit-log?page_size=6'),
         api.get('/admin/reports/sales?range=weekly'),
@@ -50,7 +54,6 @@ const Dashboard = () => {
       setAuditLogs(logsRes.data);
       setSalesReport(salesRes.data);
 
-      // Build top products from sales report (mock top 5 if not available)
       if (salesRes.data?.top_products) {
         setTopProducts(salesRes.data.top_products.slice(0, 5));
       }
@@ -66,7 +69,7 @@ const Dashboard = () => {
     load();
     const interval = setInterval(load, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [startDate, endDate]);
 
   const formatAmount = (paise) => `₹${((paise || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
   const formatAmountShort = (paise) => {
@@ -103,9 +106,19 @@ const Dashboard = () => {
       sub: 'Registered buyers'
     },
     {
-      title: 'Pending Orders', value: salesReport?.pending_orders || 0, icon: AlertCircle,
-      color: '#f59e0b', bg: '#fef3c7',
-      sub: 'Awaiting confirmation'
+      title: 'Total Liability', value: formatAmountShort(kpis.total_liability), icon: IndianRupee,
+      color: 'var(--danger)', bg: 'var(--danger-light)',
+      sub: 'Outstanding payables'
+    },
+    {
+      title: 'Total Debt', value: formatAmountShort(kpis.total_debt), icon: IndianRupee,
+      color: 'var(--warning)', bg: 'var(--warning-light)',
+      sub: 'Outstanding receivables'
+    },
+    {
+      title: 'Total Stock', value: formatAmountShort(kpis.total_stock_value), icon: Package,
+      color: '#06b6d4', bg: '#ecfeff',
+      sub: `${kpis.total_stock_qty || 0} items on hand`
     },
   ];
 
@@ -120,7 +133,7 @@ const Dashboard = () => {
   return (
     <div>
       {/* Header */}
-      <div className="view-header">
+      <div className="view-header" style={{ marginBottom: 16 }}>
         <div className="view-title-wrap">
           <h1>Dashboard</h1>
           <p>Platform overview & key metrics — Last updated: {lastRefresh.toLocaleTimeString()}</p>
@@ -128,6 +141,86 @@ const Dashboard = () => {
         <button className="btn btn-secondary" onClick={() => { setLoading(true); load(); }} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <RefreshCw size={14} /> Refresh
         </button>
+      </div>
+
+      {/* Date Selector Bar */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 16,
+        padding: '12px 16px',
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border-color)',
+        borderRadius: 'var(--radius-lg)',
+        marginBottom: 24,
+        flexWrap: 'wrap'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Filter Period:</span>
+          {[
+            { label: 'All Time', start: '', end: '' },
+            { label: 'Last 7 Days', start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), end: new Date().toISOString().slice(0, 10) },
+            { label: 'This Month', start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10), end: new Date().toISOString().slice(0, 10) },
+            { label: 'This Year', start: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), end: new Date().toISOString().slice(0, 10) },
+          ].map(preset => {
+            const isSelected = startDate === preset.start && endDate === preset.end;
+            return (
+              <button
+                key={preset.label}
+                type="button"
+                className="btn"
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.75rem',
+                  backgroundColor: isSelected ? 'var(--primary)' : 'var(--bg-primary)',
+                  color: isSelected ? '#fff' : 'var(--text-primary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-sm)',
+                  height: 'auto',
+                  cursor: 'pointer'
+                }}
+                onClick={() => {
+                  setStartDate(preset.start);
+                  setEndDate(preset.end);
+                }}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Calendar size={14} color="var(--text-muted)" />
+            <input
+              type="date"
+              className="form-input"
+              style={{ marginBottom: 0, padding: '4px 8px', fontSize: '0.8rem', height: 30, width: 125 }}
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+            />
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>to</span>
+            <input
+              type="date"
+              className="form-input"
+              style={{ marginBottom: 0, padding: '4px 8px', fontSize: '0.8rem', height: 30, width: 125 }}
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+            />
+          </div>
+          {(startDate || endDate) && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              style={{ padding: '4px 8px', height: 30, fontSize: '0.75rem', cursor: 'pointer' }}
+              onClick={() => { setStartDate(''); setEndDate(''); }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       {/* KPI Cards */}

@@ -34,10 +34,16 @@ const sendNotificationSchema = z.object({
   target_audience: z.enum(['all', 'vendors', 'retailers']).default('all'),
 });
 
+const dashboardQuerySchema = z.object({
+  start_date: z.string().optional(),
+  end_date: z.string().optional(),
+});
+
 // ── Reports: Dashboard KPIs ──────────────────────────────────
 router.get('/reports/dashboard', getCurrentUser as any, requireAdmin as any, async (req, res, next) => {
   try {
-    const kpis = await adminService.getDashboardKPIs();
+    const { start_date, end_date } = dashboardQuerySchema.parse(req.query);
+    const kpis = await adminService.getDashboardKPIs(start_date, end_date);
     return res.status(200).json(kpis);
   } catch (error) {
     next(error);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Search, X, FileText, ChevronLeft, ChevronRight, Calendar, Filter } from 'lucide-react';
+import { Search, X, FileText, ChevronLeft, ChevronRight, Calendar, Filter, Plus } from 'lucide-react';
 
 const statusOptions = ['pending', 'confirmed', 'dispatched', 'delivered', 'cancelled', 'returned'];
 
@@ -12,7 +12,7 @@ const statusColor = {
 const fmt = (paise) => `₹${((paise || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 
 // ── Order Detail Modal ──────────────────────────────────────────
-const OrderDetailModal = ({ order, onClose, onStatusUpdate }) => {
+const OrderDetailModal = ({ order, onClose, onStatusUpdate, onEditDiscount }) => {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('');
 
@@ -79,10 +79,24 @@ const OrderDetailModal = ({ order, onClose, onStatusUpdate }) => {
                   <span style={{ color: 'var(--text-muted)' }}>GST</span>
                   <span style={{ fontWeight: 600 }}>{fmt(order.gst_amount)}</span>
                 </div>
+                {order.discount_amount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: 'var(--danger)' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Discount</span>
+                    <span style={{ fontWeight: 600 }}>-{fmt(order.discount_amount)}</span>
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', borderTop: '1px solid var(--border-color)', paddingTop: 4, marginTop: 4 }}>
                   <span style={{ fontWeight: 700 }}>Grand Total</span>
                   <span style={{ fontWeight: 800, color: 'var(--primary)' }}>{fmt(order.grand_total)}</span>
                 </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  style={{ marginTop: 8, padding: '4px 8px', fontSize: '0.72rem', width: 'fit-content' }}
+                  onClick={() => onEditDiscount(order)}
+                >
+                  Edit Discount
+                </button>
               </div>
             </div>
           </div>
@@ -123,7 +137,7 @@ const OrderDetailModal = ({ order, onClose, onStatusUpdate }) => {
                         {item.sku && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>SKU: {item.sku}</div>}
                       </td>
                       <td style={{ textAlign: 'right' }}>{fmt(item.unit_price || item.price)}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{item.quantity}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{item.quantity} {item.unit || 'pcs'}</td>
                       <td style={{ textAlign: 'right' }}>{item.gst_rate || 0}%</td>
                       <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }}>
                         {fmt((item.unit_price || item.price || 0) * item.quantity)}
@@ -185,6 +199,31 @@ const Orders = () => {
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
+  // New states for creating order on behalf
+  const [showCreateOrderModal, setShowCreateOrderModal] = useState(false);
+  const [retailersList, setRetailersList] = useState([]);
+  const [productsList, setProductsList] = useState([]);
+  const [createOrderForm, setCreateOrderForm] = useState({
+    retailerId: '',
+    deliveryAddress: '',
+    items: [{ productId: '', quantity: 1, unitPrice: '', unit: 'pcs' }],
+    discountAmount: 0, // in rupees
+    applyDeliveryCharge: true,
+    deliveryChargeAmount: 39 // default 39 INR
+  });
+
+  // New states for custom discount updates
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [orderForDiscount, setOrderForDiscount] = useState(null);
+  const [discountValue, setDiscountValue] = useState('');
+
+  // Unregistered customer states
+  const [unregName, setUnregName] = useState('');
+  const [unregMobile, setUnregMobile] = useState('');
+  const [unregAddress, setUnregAddress] = useState('');
+
+
+
   const load = async () => {
     try {
       setLoading(true);
@@ -202,6 +241,156 @@ const Orders = () => {
   };
 
   useEffect(() => { load(); }, [statusFilter, page, dateFrom, dateTo]);
+
+  const loadMetadata = async () => {
+    try {
+      const [retRes, prodRes] = await Promise.all([
+        api.get('/admin/retailers'),
+        api.get('/products', { params: { page_size: 1000 } })
+      ]);
+      setRetailersList(retRes.data || []);
+      setProductsList(prodRes.data || []);
+    } catch (err) {
+      console.error('Error loading metadata:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadMetadata();
+  }, []);
+
+  const handleRetailerChange = (retailerId) => {
+    if (retailerId === 'unregistered') {
+      setCreateOrderForm(prev => ({
+        ...prev,
+        retailerId: retailerId,
+        deliveryAddress: unregAddress
+      }));
+      return;
+    }
+    const retailer = retailersList.find(r => r.id === retailerId || r.retailer_profile?.id === retailerId || r.user_id === retailerId);
+    const profile = retailer?.retailer_profile;
+    const address = profile ? `${profile.address || ''}, ${profile.city || ''}, ${profile.state || ''} - ${profile.pincode || ''}` : '';
+    setCreateOrderForm(prev => ({
+      ...prev,
+      retailerId: retailerId,
+      deliveryAddress: address
+    }));
+  };
+
+  const handleCreateOrderItemChange = (index, field, value) => {
+    const newItems = [...createOrderForm.items];
+    newItems[index][field] = field === 'quantity' ? Number(value) : value;
+
+    if (field === 'productId') {
+      const prod = productsList.find(p => p.id === value);
+      if (prod) {
+        newItems[index].unitPrice = (prod.basePrice / 100).toFixed(2);
+        newItems[index].unit = prod.unit || 'pcs';
+      }
+    }
+    setCreateOrderForm(prev => ({ ...prev, items: newItems }));
+  };
+
+  const addCreateOrderItem = () => {
+    setCreateOrderForm(prev => ({
+      ...prev,
+      items: [...prev.items, { productId: '', quantity: 1, unitPrice: '', unit: 'pcs' }]
+    }));
+  };
+
+  const removeCreateOrderItem = (index) => {
+    if (createOrderForm.items.length === 1) return;
+    setCreateOrderForm(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleCreateOrderBehalfSubmit = async (e) => {
+    e.preventDefault();
+    if (!createOrderForm.retailerId) return alert('Please select a customer (retailer)');
+    if (createOrderForm.retailerId === 'unregistered' && (!unregName || !unregMobile || !unregAddress)) {
+      return alert('Please fill in unregistered customer details');
+    }
+    if (createOrderForm.items.some(i => !i.productId || i.quantity <= 0)) {
+      return alert('Please select valid products and quantities');
+    }
+
+    try {
+      const itemsPayload = createOrderForm.items.map(item => {
+        const payloadItem = {
+          productId: item.productId,
+          quantity: item.quantity,
+          unit: item.unit || 'pcs'
+        };
+        if (item.unitPrice !== '') {
+          payloadItem.unitPrice = Math.round(Number(item.unitPrice) * 100);
+        }
+        return payloadItem;
+      });
+
+      const payload = {
+        retailerId: createOrderForm.retailerId,
+        deliveryAddress: createOrderForm.deliveryAddress,
+        items: itemsPayload,
+        discountAmount: Math.round(Number(createOrderForm.discountAmount || 0) * 100),
+        deliveryCharge: createOrderForm.applyDeliveryCharge ? Math.round(Number(createOrderForm.deliveryChargeAmount || 0) * 100) : 0
+      };
+
+      if (createOrderForm.retailerId === 'unregistered') {
+        payload.unregisteredCustomer = {
+          name: unregName,
+          mobile: unregMobile,
+          address: unregAddress
+        };
+      }
+
+      await api.post('/admin/orders', payload);
+      alert('Order created successfully on behalf of customer!');
+      setShowCreateOrderModal(false);
+      setCreateOrderForm({
+        retailerId: '',
+        deliveryAddress: '',
+        items: [{ productId: '', quantity: 1, unitPrice: '', unit: 'pcs' }],
+        discountAmount: 0,
+        applyDeliveryCharge: true,
+        deliveryChargeAmount: 39
+      });
+      setUnregName('');
+      setUnregMobile('');
+      setUnregAddress('');
+      load();
+    } catch (err) {
+      alert(err.response?.data?.message || err.response?.data?.detail || 'Failed to create order');
+    }
+  };
+
+  const openDiscountModal = (order) => {
+    setOrderForDiscount(order);
+    setDiscountValue((order.discount_amount / 100).toFixed(2));
+    setShowDiscountModal(true);
+  };
+
+  const handleApplyDiscountSubmit = async (e) => {
+    e.preventDefault();
+    if (!orderForDiscount) return;
+
+    try {
+      const discountPaise = Math.round(Number(discountValue || 0) * 100);
+      await api.patch(`/admin/orders/${orderForDiscount.id}/discount`, { discountAmount: discountPaise });
+      alert('Discount updated successfully!');
+      setShowDiscountModal(false);
+      setOrderForDiscount(null);
+      setDiscountValue('');
+      load();
+      if (selectedOrder?.id === orderForDiscount.id) {
+        setSelectedOrder(prev => ({ ...prev, discount_amount: discountPaise, grand_total: Math.max(0, prev.subtotal + prev.gst_amount - discountPaise) }));
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || err.response?.data?.detail || 'Failed to update discount');
+    }
+  };
 
   const updateStatus = async (orderId, newStatus) => {
     try {
@@ -292,6 +481,9 @@ const Orders = () => {
       <div className="view-header">
         <div className="view-title-wrap"><h1>Orders</h1><p>Track and manage all platform orders</p></div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" onClick={() => setShowCreateOrderModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Plus size={16} /> Create Order (Behalf)
+          </button>
           <button className="btn btn-secondary" onClick={handleExportGeneral}>
             Export CSV
           </button>
@@ -427,6 +619,13 @@ const Orders = () => {
                       >
                         <FileText size={11} /> Details
                       </button>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        style={{ fontSize: '0.72rem', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 3 }}
+                        onClick={() => openDiscountModal(o)}
+                      >
+                        ₹ Discount
+                      </button>
                       {o.status !== 'delivered' && o.status !== 'cancelled' && (
                         <select
                           className="select-filter"
@@ -480,7 +679,292 @@ const Orders = () => {
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           onStatusUpdate={updateStatus}
+          onEditDiscount={openDiscountModal}
         />
+      )}
+
+      {/* Create Order Modal (Behalf of Customer) */}
+      {showCreateOrderModal && (
+        <div className="modal-overlay" onClick={() => setShowCreateOrderModal(false)}>
+          <div className="modal-content" style={{ maxWidth: 760, width: '95vw' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 style={{ margin: 0 }}>Create Order on Behalf of Customer</h2>
+              <button onClick={() => setShowCreateOrderModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateOrderBehalfSubmit}>
+              <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                
+                {/* Select Customer */}
+                <div className="form-group">
+                  <label className="form-label">Select Customer (Retailer) *</label>
+                  <select
+                    className="form-select"
+                    required
+                    value={createOrderForm.retailerId}
+                    onChange={e => handleRetailerChange(e.target.value)}
+                  >
+                    <option value="">-- Choose Retailer --</option>
+                    <option value="unregistered">-- Other (Unregistered Customer) --</option>
+                    {retailersList.map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.retailer_profile?.business_name || r.fullName} ({r.mobile})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Unregistered Customer Fields */}
+                {createOrderForm.retailerId === 'unregistered' && (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 12,
+                    padding: 14,
+                    background: 'var(--bg-secondary)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-color)',
+                    marginTop: -4
+                  }}>
+                    <div className="form-group">
+                      <label className="form-label">Customer Name *</label>
+                      <input
+                        type="text"
+                        required
+                        className="form-input"
+                        placeholder="Enter full name..."
+                        value={unregName}
+                        onChange={e => setUnregName(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Mobile Number *</label>
+                      <input
+                        type="tel"
+                        required
+                        className="form-input"
+                        placeholder="Enter mobile..."
+                        value={unregMobile}
+                        onChange={e => setUnregMobile(e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group" style={{ gridColumn: 'span 2', marginBottom: 0 }}>
+                      <label className="form-label">Customer Address *</label>
+                      <input
+                        type="text"
+                        required
+                        className="form-input"
+                        placeholder="Enter full address..."
+                        value={unregAddress}
+                        onChange={e => {
+                          setUnregAddress(e.target.value);
+                          setCreateOrderForm(prev => ({ ...prev, deliveryAddress: e.target.value }));
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Delivery Address */}
+                <div className="form-group">
+                  <label className="form-label">Delivery Address *</label>
+                  <textarea
+                    className="form-input"
+                    required
+                    rows={2}
+                    placeholder="Enter full shipping address..."
+                    value={createOrderForm.deliveryAddress}
+                    onChange={e => setCreateOrderForm({ ...createOrderForm, deliveryAddress: e.target.value })}
+                  />
+                </div>
+
+                {/* Line Items */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <span className="form-label" style={{ marginBottom: 0 }}>Order Items *</span>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={addCreateOrderItem}>
+                      + Add Item
+                    </button>
+                  </div>
+
+                  <table className="custom-table" style={{ fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr>
+                        <th>Product</th>
+                        <th style={{ width: 80 }}>Qty</th>
+                        <th style={{ width: 90 }}>Unit</th>
+                        <th style={{ width: 120 }}>Unit Price (₹)</th>
+                        <th style={{ width: 100, textAlign: 'right' }}>Total</th>
+                        <th style={{ width: 40 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {createOrderForm.items.map((item, idx) => (
+                        <tr key={idx}>
+                          <td>
+                            <select
+                              required
+                              className="form-select"
+                              style={{ padding: '6px 8px', fontSize: '0.8rem', width: '100%' }}
+                              value={item.productId}
+                              onChange={e => handleCreateOrderItemChange(idx, 'productId', e.target.value)}
+                            >
+                              <option value="">-- Select Product --</option>
+                              {productsList.map(p => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} (Stock: {p.stockQty} {p.unit})
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              required
+                              min="1"
+                              className="form-input"
+                              style={{ padding: '6px 8px', fontSize: '0.8rem', marginBottom: 0 }}
+                              value={item.quantity}
+                              onChange={e => handleCreateOrderItemChange(idx, 'quantity', e.target.value)}
+                            />
+                          </td>
+                          <td>
+                            <select
+                              className="form-select"
+                              style={{ padding: '6px 8px', fontSize: '0.8rem', marginBottom: 0 }}
+                              value={item.unit || 'pcs'}
+                              onChange={e => handleCreateOrderItemChange(idx, 'unit', e.target.value)}
+                            >
+                              <option value="pcs">pcs</option>
+                              <option value="kg">kg</option>
+                              <option value="gm">gm</option>
+                              <option value="kg / gm">kg / gm</option>
+                              <option value="box">box</option>
+                              <option value="packet">packet</option>
+                              <option value="liter">liter</option>
+                            </select>
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="Price"
+                              required
+                              className="form-input"
+                              style={{ padding: '6px 8px', fontSize: '0.8rem', marginBottom: 0 }}
+                              value={item.unitPrice}
+                              onChange={e => handleCreateOrderItemChange(idx, 'unitPrice', e.target.value)}
+                            />
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                            ₹{((item.quantity * Number(item.unitPrice || 0))).toFixed(2)}
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              style={{ color: 'var(--danger)', padding: '4px 8px' }}
+                              disabled={createOrderForm.items.length === 1}
+                              onClick={() => removeCreateOrderItem(idx)}
+                            >
+                              ✕
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Custom Discount & Delivery Charges */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="form-group">
+                    <label className="form-label">Custom Discount (₹)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      className="form-input"
+                      value={createOrderForm.discountAmount || ''}
+                      onChange={e => setCreateOrderForm({ ...createOrderForm, discountAmount: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <label className="form-label" style={{ margin: 0 }}>Delivery Charge (₹)</label>
+                      <label style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: 'var(--primary)' }}>
+                        <input
+                          type="checkbox"
+                          checked={createOrderForm.applyDeliveryCharge}
+                          onChange={e => setCreateOrderForm({ ...createOrderForm, applyDeliveryCharge: e.target.checked })}
+                        />
+                        Apply Charge
+                      </label>
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="39.00"
+                      disabled={!createOrderForm.applyDeliveryCharge}
+                      className="form-input"
+                      value={createOrderForm.applyDeliveryCharge ? createOrderForm.deliveryChargeAmount : ''}
+                      onChange={e => setCreateOrderForm({ ...createOrderForm, deliveryChargeAmount: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowCreateOrderModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Create Order</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Apply Discount Modal */}
+      {showDiscountModal && orderForDiscount && (
+        <div className="modal-overlay" onClick={() => { setShowDiscountModal(false); setOrderForDiscount(null); }}>
+          <div className="modal-content" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 style={{ margin: 0 }}>Apply Custom Discount</h2>
+              <button onClick={() => { setShowDiscountModal(false); setOrderForDiscount(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleApplyDiscountSubmit}>
+              <div className="modal-body">
+                <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: 12 }}>
+                  Order: <strong>{orderForDiscount.order_number}</strong><br />
+                  Current Subtotal + GST: <strong>{fmt(orderForDiscount.subtotal + orderForDiscount.gst_amount)}</strong>
+                </p>
+                <div className="form-group">
+                  <label className="form-label">Discount Amount (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Enter discount in Rupees..."
+                    required
+                    className="form-input"
+                    value={discountValue}
+                    onChange={e => setDiscountValue(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowDiscountModal(false); setOrderForDiscount(null); }}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Apply Discount</button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

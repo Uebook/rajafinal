@@ -186,7 +186,7 @@ const Categories = () => {
             <Download size={16} /> Export CSV
           </button>
           <button id="add-category-btn" className="btn btn-primary" onClick={openCreate}>
-            <Plus size={16} /> Add Category
+            <Plus size={16} /> Add Category / Subcategory
           </button>
         </div>
       </div>

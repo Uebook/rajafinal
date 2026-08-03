@@ -1,25 +1,37 @@
 import crypto from 'crypto';
 import { db } from '../db/index.js';
-import { orders, vendors, retailers, auditLog, users } from '../db/schema.js';
-import { eq, and, count, sum, gte, lte, desc, ilike, ne } from 'drizzle-orm';
+import { orders, vendors, retailers, auditLog, users, purchases, purchaseItems, products, ledgerEntries } from '../db/schema.js';
+import { eq, and, count, sum, gte, lte, desc, ilike, ne, sql } from 'drizzle-orm';
 import { AppError } from '../utils/errors.js';
 import PDFDocument from 'pdfkit';
 
 export class AdminService {
   // ── P4-07: Reports & Analytics (Dashboard KPIs) ──────────────
 
-  async getDashboardKPIs() {
+  async getDashboardKPIs(startDate?: string, endDate?: string) {
+    const orderConditions = [eq(orders.isDeleted, false)];
+    const revenueConditions = [eq(orders.isDeleted, false), ne(orders.status, 'CANCELLED')];
+
+    if (startDate) {
+      orderConditions.push(gte(orders.createdAt, new Date(startDate)));
+      revenueConditions.push(gte(orders.createdAt, new Date(startDate)));
+    }
+    if (endDate) {
+      orderConditions.push(lte(orders.createdAt, new Date(endDate)));
+      revenueConditions.push(lte(orders.createdAt, new Date(endDate)));
+    }
+
     // Total orders count
     const [totalOrdersRes] = await db
       .select({ count: count(orders.id) })
       .from(orders)
-      .where(eq(orders.isDeleted, false));
+      .where(and(...orderConditions));
 
     // Total revenue sum (excluding cancelled orders)
     const [totalRevenueRes] = await db
       .select({ sum: sum(orders.grandTotal) })
       .from(orders)
-      .where(and(eq(orders.isDeleted, false), ne(orders.status, 'CANCELLED')));
+      .where(and(...revenueConditions));
 
     // Active vendors count
     const [activeVendorsRes] = await db
@@ -33,11 +45,67 @@ export class AdminService {
       .from(retailers)
       .where(eq(retailers.isDeleted, false));
 
+    // Total Liability (Supplier unpaid balance)
+    const liabilityConditions = [eq(purchases.isDeleted, false)];
+    if (startDate) {
+      liabilityConditions.push(gte(purchases.invoiceDate, new Date(startDate)));
+    }
+    if (endDate) {
+      liabilityConditions.push(lte(purchases.invoiceDate, new Date(endDate)));
+    }
+    const [liabilityRes] = await db
+      .select({
+        sum: sql<number>`COALESCE(SUM(${purchases.totalAmount} - ${purchases.paidAmount}), 0)`
+      })
+      .from(purchases)
+      .where(and(...liabilityConditions));
+    const totalLiability = Number(liabilityRes?.sum || 0);
+
+    // Total Debt (Retailer outstanding balance)
+    const debtConditions = [
+      eq(users.role, 'RETAILER'),
+      eq(ledgerEntries.isDeleted, false)
+    ];
+    if (startDate) {
+      debtConditions.push(gte(ledgerEntries.createdAt, new Date(startDate)));
+    }
+    if (endDate) {
+      debtConditions.push(lte(ledgerEntries.createdAt, new Date(endDate)));
+    }
+    const [debtRes] = await db
+      .select({
+        debits: sql<number>`COALESCE(SUM(CASE WHEN ${ledgerEntries.entryType} = 'DEBIT' THEN ${ledgerEntries.amount} ELSE 0 END), 0)`,
+        credits: sql<number>`COALESCE(SUM(CASE WHEN ${ledgerEntries.entryType} = 'CREDIT' THEN ${ledgerEntries.amount} ELSE 0 END), 0)`,
+      })
+      .from(ledgerEntries)
+      .innerJoin(users, eq(ledgerEntries.userId, users.id))
+      .where(and(...debtConditions));
+    const totalDebt = Number(debtRes?.debits || 0) - Number(debtRes?.credits || 0);
+
+    // Total Stock (Valuation & Quantity)
+    const stockConditions = [eq(products.isDeleted, false)];
+    if (endDate) {
+      stockConditions.push(lte(products.createdAt, new Date(endDate)));
+    }
+    const [stockRes] = await db
+      .select({
+        value: sql<number>`COALESCE(SUM(${products.stockQty} * ${products.basePrice}), 0)`,
+        qty: sql<number>`COALESCE(SUM(${products.stockQty}), 0)`
+      })
+      .from(products)
+      .where(and(...stockConditions));
+    const totalStockValue = Number(stockRes?.value || 0);
+    const totalStockQty = Number(stockRes?.qty || 0);
+
     return {
       total_orders: totalOrdersRes?.count || 0,
       total_revenue: totalRevenueRes?.sum ? Number(totalRevenueRes.sum) : 0,
       active_vendors: activeVendorsRes?.count || 0,
       active_retailers: activeRetailersRes?.count || 0,
+      total_liability: totalLiability,
+      total_debt: totalDebt,
+      total_stock_value: totalStockValue,
+      total_stock_qty: totalStockQty,
     };
   }
 

@@ -38,7 +38,7 @@ const Purchases = () => {
     invoiceDate: new Date().toISOString().slice(0, 10),
     paidAmount: 0,
     notes: '',
-    items: [{ productId: '', quantity: 1, purchaseRate: 0 }],
+    items: [{ productId: '', quantity: 1, purchaseRate: 0, unit: 'pcs' }],
   });
 
   // Payment Modal
@@ -97,11 +97,14 @@ const Purchases = () => {
     const newItems = [...purchaseForm.items];
     newItems[index][field] = field === 'quantity' || field === 'purchaseRate' ? Number(value) : value;
 
-    // Auto populate default base price as fallback rate if product selected
+    // Auto populate default base price & unit if product selected
     if (field === 'productId') {
       const prod = products.find(p => p.id === value);
-      if (prod && !newItems[index].purchaseRate) {
-        newItems[index].purchaseRate = prod.basePrice || 0;
+      if (prod) {
+        if (!newItems[index].purchaseRate) {
+          newItems[index].purchaseRate = prod.basePrice || 0;
+        }
+        newItems[index].unit = prod.unit || 'pcs';
       }
     }
     setPurchaseForm({ ...purchaseForm, items: newItems });
@@ -110,7 +113,7 @@ const Purchases = () => {
   const addItemRow = () => {
     setPurchaseForm({
       ...purchaseForm,
-      items: [...purchaseForm.items, { productId: '', quantity: 1, purchaseRate: 0 }],
+      items: [...purchaseForm.items, { productId: '', quantity: 1, purchaseRate: 0, unit: 'pcs' }],
     });
   };
 
@@ -141,7 +144,7 @@ const Purchases = () => {
         invoiceDate: new Date().toISOString().slice(0, 10),
         paidAmount: 0,
         notes: '',
-        items: [{ productId: '', quantity: 1, purchaseRate: 0 }],
+        items: [{ productId: '', quantity: 1, purchaseRate: 0, unit: 'pcs' }],
       });
       loadData();
     } catch (err) {
@@ -611,7 +614,7 @@ const Purchases = () => {
                     marginBottom: 10
                   }}>
                     <div style={{ flex: 1 }}>Product Name</div>
-                    <div style={{ width: 90 }}>Qty / Unit</div>
+                    <div style={{ width: 150 }}>Qty / Unit</div>
                     <div style={{ width: 120 }}>Purchase Rate (₹)</div>
                     <div style={{ width: 100, textAlign: 'right' }}>Total Amount</div>
                     <div style={{ width: 28 }}></div>
@@ -645,7 +648,7 @@ const Purchases = () => {
                         </select>
                       </div>
 
-                      <div style={{ width: 90 }}>
+                      <div style={{ width: 150, display: 'flex', gap: 6 }}>
                         <input
                           type="number"
                           min="1"
@@ -654,8 +657,22 @@ const Purchases = () => {
                           value={item.quantity}
                           onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
                           className="form-input"
-                          style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                          style={{ padding: '6px 10px', fontSize: '0.8rem', width: 65 }}
                         />
+                        <select
+                          value={item.unit || 'pcs'}
+                          onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
+                          className="form-select"
+                          style={{ padding: '6px 8px', fontSize: '0.8rem', flex: 1 }}
+                        >
+                          <option value="pcs">pcs</option>
+                          <option value="kg">kg</option>
+                          <option value="gm">gm</option>
+                          <option value="kg / gm">kg / gm</option>
+                          <option value="box">box</option>
+                          <option value="packet">packet</option>
+                          <option value="liter">liter</option>
+                        </select>
                       </div>
 
                       <div style={{ width: 120 }}>

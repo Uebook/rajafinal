@@ -50,15 +50,6 @@ const Ledger = () => {
   const [pageOwn, setPageOwn] = useState(1);
   const itemsPerPage = 20;
 
-  useEffect(() => {
-    setPageHistory(1);
-    setPageOwn(1);
-  }, [datePreset, selectedMonth, selectedYear, entryTypeFilter, keywordFilter, customStartDate, customEndDate]);
-
-  useEffect(() => {
-    setPageRetailers(1);
-  }, [searchQuery]);
-
   // Filter States for Ledger Detail Page
   const [datePreset, setDatePreset] = useState('all'); // all, week, month, year, custom
   const [selectedMonth, setSelectedMonth] = useState('all');
@@ -67,6 +58,15 @@ const Ledger = () => {
   const [keywordFilter, setKeywordFilter] = useState('');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+
+  useEffect(() => {
+    setPageHistory(1);
+    setPageOwn(1);
+  }, [datePreset, selectedMonth, selectedYear, entryTypeFilter, keywordFilter, customStartDate, customEndDate]);
+
+  useEffect(() => {
+    setPageRetailers(1);
+  }, [searchQuery]);
 
   const [loading, setLoading] = useState(true);
 

@@ -4,7 +4,7 @@ import { OrderService } from '../services/order.service.js';
 import { AuditService } from '../services/audit.service.js';
 import { z } from 'zod';
 import { db } from '../db/index.js';
-import { orders, orderItems, ledgerEntries, retailers, products, users, carts, cartItems, discountCodes } from '../db/schema.js';
+import { orders, orderItems, ledgerEntries, retailers, products, users, carts, cartItems, discountCodes, retailerPricing } from '../db/schema.js';
 import { eq, and, inArray } from 'drizzle-orm';
 import crypto from 'crypto';
 import { AppError } from '../utils/errors.js';
@@ -296,6 +296,260 @@ router.patch('/admin/orders/:id/status', getCurrentUser as any, requireAdmin as 
     next(error);
   }
 });
+
+const adminOrderCreateSchema = z.object({
+  retailerId: z.string(), // uuid or 'unregistered'
+  deliveryAddress: z.string().min(1, 'Delivery address is required'),
+  items: z.array(z.object({
+    productId: z.string().uuid('Invalid product ID'),
+    quantity: z.number().int().positive('Quantity must be greater than 0'),
+    unitPrice: z.number().int().positive('Price must be greater than 0').optional(), // price in paise
+    unit: z.string().optional(),
+  })).min(1, 'At least one item is required'),
+  discountAmount: z.number().int().nonnegative().optional(), // discount in paise
+  unregisteredCustomer: z.object({
+    name: z.string().min(1, 'Name is required'),
+    mobile: z.string().min(1, 'Mobile number is required'),
+    address: z.string().min(1, 'Address is required'),
+  }).optional(),
+});
+
+const orderDiscountUpdateSchema = z.object({
+  discountAmount: z.number().int().nonnegative('Discount must be >= 0'), // discount in paise
+});
+
+// ── Place Order on Behalf of Customer (Admin) ─────────────────
+router.post('/admin/orders', getCurrentUser as any, requireAdmin as any, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { retailerId: inputRetailerId, deliveryAddress, items, discountAmount = 0, unregisteredCustomer } = adminOrderCreateSchema.parse(req.body);
+
+    let retailerId = inputRetailerId;
+    let customerName = '';
+
+    if (retailerId === 'unregistered') {
+      if (!unregisteredCustomer) {
+        throw new AppError(400, 'Unregistered customer details are required', 'BAD_REQUEST');
+      }
+
+      // Check if user already exists with this mobile number
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.mobile, unregisteredCustomer.mobile), eq(users.isDeleted, false)));
+
+      if (existingUser) {
+        retailerId = existingUser.id;
+        customerName = existingUser.fullName;
+      } else {
+        // Create new user & retailer profile on the fly
+        const newUserId = crypto.randomUUID();
+        const randomPassword = crypto.randomBytes(16).toString('hex');
+        
+        await db
+          .insert(users)
+          .values({
+            id: newUserId,
+            fullName: unregisteredCustomer.name,
+            mobile: unregisteredCustomer.mobile,
+            role: 'RETAILER',
+            passwordHash: randomPassword,
+          } as any);
+
+        await db
+          .insert(retailers)
+          .values({
+            id: crypto.randomUUID(),
+            userId: newUserId,
+            businessName: unregisteredCustomer.name,
+            ownerName: unregisteredCustomer.name,
+            address: unregisteredCustomer.address,
+          } as any);
+
+        retailerId = newUserId;
+        customerName = unregisteredCustomer.name;
+      }
+    } else {
+      // 1. Verify retailer user exists
+      const [retailerUser] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.id, retailerId), eq(users.isDeleted, false)));
+      if (!retailerUser) {
+        throw new AppError(404, 'Retailer user not found', 'NOT_FOUND');
+      }
+      customerName = retailerUser.fullName;
+    }
+
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const randSuffix = Math.random().toString(36).substring(2, 10).toUpperCase();
+    const orderNumber = `ORD-BEHALF-${dateStr}-${randSuffix}`;
+
+    const result = await db.transaction(async (tx) => {
+      let subtotal = 0;
+      let totalGst = 0;
+      const orderItemsData = [];
+
+      for (const item of items) {
+        const [product] = await tx
+          .select()
+          .from(products)
+          .where(eq(products.id, item.productId));
+        
+        if (!product || product.stockQty < item.quantity) {
+          throw new AppError(400, `Insufficient stock for ${product ? product.name : 'unknown product'}`, 'BAD_REQUEST');
+        }
+
+        // Deduct stock
+        await tx
+          .update(products)
+          .set({ stockQty: product.stockQty - item.quantity })
+          .where(eq(products.id, product.id));
+
+        // Resolve unit price: override if provided, otherwise check retailerPricing, then basePrice
+        let unitPrice = item.unitPrice;
+        if (unitPrice === undefined) {
+          const [rp] = await tx
+            .select()
+            .from(retailerPricing)
+            .where(and(eq(retailerPricing.productId, product.id), eq(retailerPricing.isDeleted, false)));
+          unitPrice = rp ? rp.price : product.basePrice;
+        }
+
+        const lineTotal = unitPrice * item.quantity;
+        const gstAmount = Math.round(lineTotal * product.gstRate / 100);
+
+        orderItemsData.push({
+          id: crypto.randomUUID(),
+          productId: product.id,
+          productName: product.name,
+          quantity: item.quantity,
+          unitPrice: unitPrice,
+          gstRate: product.gstRate,
+          lineTotal: lineTotal,
+          gstAmount: gstAmount,
+          unit: item.unit || product.unit || 'pcs',
+        });
+
+        subtotal += lineTotal;
+        totalGst += gstAmount;
+      }
+
+      const grandTotal = Math.max(0, subtotal + totalGst - discountAmount);
+      const orderId = crypto.randomUUID();
+
+      const [insertedOrder] = await tx
+        .insert(orders)
+        .values({
+          id: orderId,
+          userId: retailerId,
+          orderNumber: orderNumber,
+          subtotal: subtotal,
+          gstAmount: totalGst,
+          discountAmount: discountAmount,
+          grandTotal: grandTotal,
+          deliveryAddress: deliveryAddress,
+          status: 'CONFIRMED',
+        } as any)
+        .returning();
+
+      for (const oi of orderItemsData) {
+        await tx.insert(orderItems).values({
+          ...oi,
+          orderId: orderId,
+        } as any);
+      }
+
+      await tx.insert(ledgerEntries).values({
+        id: crypto.randomUUID(),
+        userId: retailerId,
+        entryType: 'DEBIT',
+        amount: grandTotal,
+        referenceType: 'order',
+        referenceId: orderId,
+        description: `Order ${orderNumber} placed by Admin`,
+        voucherType: 'SALES',
+        debitAccount: `Retailer: ${customerName}`,
+        creditAccount: 'Sales Account',
+      } as any);
+
+      return insertedOrder;
+    });
+
+    await auditService.logAction(
+      req.user!.id,
+      req.user!.role,
+      'create_order_behalf',
+      'order',
+      result.id,
+      { retailerId, orderNumber }
+    );
+
+    return res.status(201).json(result);
+  } catch (error) {
+    console.error('Error in POST /admin/orders:', error);
+    next(error);
+  }
+});
+
+// ── Update Order Discount (Admin) ─────────────────────────────
+router.patch('/admin/orders/:id/discount', getCurrentUser as any, requireAdmin as any, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { discountAmount } = orderDiscountUpdateSchema.parse(req.body);
+    const { id } = req.params;
+
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(and(eq(orders.id, id), eq(orders.isDeleted, false)));
+    if (!order) {
+      throw new AppError(404, 'Order not found', 'NOT_FOUND');
+    }
+
+    const newGrandTotal = Math.max(0, order.subtotal + order.gstAmount - discountAmount);
+
+    const result = await db.transaction(async (tx) => {
+      const [updatedOrder] = await tx
+        .update(orders)
+        .set({
+          discountAmount: discountAmount,
+          grandTotal: newGrandTotal,
+          updatedAt: new Date(),
+        })
+        .where(eq(orders.id, id))
+        .returning();
+
+      // Update the DEBIT ledger entry associated with this order
+      await tx
+        .update(ledgerEntries)
+        .set({
+          amount: newGrandTotal,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(ledgerEntries.referenceId, id),
+          eq(ledgerEntries.entryType, 'DEBIT'),
+          eq(ledgerEntries.isDeleted, false)
+        ));
+
+      return updatedOrder;
+    });
+
+    await auditService.logAction(
+      req.user!.id,
+      req.user!.role,
+      'update_order_discount',
+      'order',
+      id,
+      { oldDiscount: order.discountAmount, newDiscount: discountAmount, newGrandTotal }
+    );
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('Error in PATCH /admin/orders/:id/discount:', error);
+    next(error);
+  }
+});
+
 
 // ── P3-16: Ledger entries ────────────────────────────────────
 router.get('/ledger', getCurrentUser as any, async (req: AuthenticatedRequest, res, next) => {

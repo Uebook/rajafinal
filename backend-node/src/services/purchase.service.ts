@@ -7,6 +7,7 @@ export interface PurchaseItemInput {
   productId: string;
   quantity: number;
   purchaseRate: number; // in rupees or sub-units
+  unit?: string;
 }
 
 export interface CreatePurchaseInput {
@@ -86,6 +87,7 @@ export class PurchaseService {
           quantity: item.quantity,
           purchaseRate: item.purchaseRate,
           totalAmount: itemTotal,
+          unit: item.unit,
         });
 
         // Update product stock only: stock_qty = stock_qty + item.quantity
@@ -200,7 +202,7 @@ export class PurchaseService {
       productId: purchaseItems.productId,
       productName: products.name,
       productSku: products.sku,
-      unit: products.unit,
+      unit: sql<string>`COALESCE(${purchaseItems.unit}, ${products.unit})`,
       quantity: purchaseItems.quantity,
       purchaseRate: purchaseItems.purchaseRate,
       totalAmount: purchaseItems.totalAmount,

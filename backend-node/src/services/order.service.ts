@@ -61,6 +61,7 @@ export class OrderService {
           gst_rate: item.gstRate,
           line_total: item.lineTotal,
           gst_amount: item.gstAmount,
+          unit: item.unit || 'pcs',
           return_policy: null,
         }));
 
