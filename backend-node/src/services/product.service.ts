@@ -58,7 +58,20 @@ export class ProductService {
       })
       .returning();
 
-    return category;
+    return {
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+      description: category.description,
+      image_url: category.imageUrl,
+      parent_id: category.parentId,
+      depth: category.depth,
+      visible_to_vendor: category.visibleToVendor,
+      visible_to_retailer: category.visibleToRetailer,
+      is_active: category.isActive,
+      created_at: category.createdAt,
+      updated_at: category.updatedAt
+    };
   }
 
   async getCategoryTree() {
@@ -114,7 +127,20 @@ export class ProductService {
       .where(and(...filters))
       .orderBy(categories.name);
 
-    return list;
+    return list.map(c => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      description: c.description,
+      image_url: c.imageUrl,
+      parent_id: c.parentId,
+      depth: c.depth,
+      visible_to_vendor: c.visibleToVendor,
+      visible_to_retailer: c.visibleToRetailer,
+      is_active: c.isActive,
+      created_at: c.createdAt,
+      updated_at: c.updatedAt
+    }));
   }
 
   async getCategoryById(id: string) {
@@ -150,7 +176,20 @@ export class ProductService {
       .where(eq(categories.id, id))
       .returning();
 
-    return updated;
+    return {
+      id: updated.id,
+      name: updated.name,
+      slug: updated.slug,
+      description: updated.description,
+      image_url: updated.imageUrl,
+      parent_id: updated.parentId,
+      depth: updated.depth,
+      visible_to_vendor: updated.visibleToVendor,
+      visible_to_retailer: updated.visibleToRetailer,
+      is_active: updated.isActive,
+      created_at: updated.createdAt,
+      updated_at: updated.updatedAt
+    };
   }
 
   async softDeleteCategory(id: string) {
