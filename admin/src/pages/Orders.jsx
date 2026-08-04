@@ -11,6 +11,28 @@ const statusColor = {
 
 const fmt = (paise) => `₹${((paise || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 
+const formatWeight = (qty, unit) => {
+  const num = Number(qty);
+  if (!num || isNaN(num)) return '';
+  if (unit === 'kg' || unit === 'kg / gm') {
+    const totalGrams = Math.round(num * 1000);
+    const kgs = Math.floor(totalGrams / 1000);
+    const gms = totalGrams % 1000;
+    if (kgs > 0 && gms > 0) return `${kgs} kg ${gms} g`;
+    if (kgs > 0) return `${kgs} kg`;
+    if (gms > 0) return `${gms} g`;
+  }
+  if (unit === 'gm') {
+    const totalGrams = Math.round(num);
+    const kgs = Math.floor(totalGrams / 1000);
+    const gms = totalGrams % 1000;
+    if (kgs > 0 && gms > 0) return `${kgs} kg ${gms} g`;
+    if (kgs > 0) return `${kgs} kg`;
+    if (gms > 0) return `${gms} g`;
+  }
+  return '';
+};
+
 // ── Order Detail Modal ──────────────────────────────────────────
 const OrderDetailModal = ({ order, onClose, onStatusUpdate, onEditDiscount }) => {
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -280,13 +302,34 @@ const Orders = () => {
 
   const handleCreateOrderItemChange = (index, field, value) => {
     const newItems = [...createOrderForm.items];
-    newItems[index][field] = field === 'quantity' ? Number(value) : value;
+
+    if (field === 'kg' || field === 'gm') {
+      if (field === 'kg') newItems[index].kgVal = value;
+      if (field === 'gm') newItems[index].gmVal = value;
+
+      const kgs = Number(field === 'kg' ? value : newItems[index].kgVal ?? Math.floor(newItems[index].quantity || 0));
+      const gms = Number(field === 'gm' ? value : newItems[index].gmVal ?? Math.round(((newItems[index].quantity || 0) % 1) * 1000));
+      newItems[index].quantity = Number((kgs + gms / 1000).toFixed(3));
+    } else {
+      newItems[index][field] = field === 'quantity' ? Number(value) : value;
+
+      if (field === 'unit' && value === 'kg / gm') {
+        const q = Number(newItems[index].quantity || 0);
+        newItems[index].kgVal = Math.floor(q);
+        newItems[index].gmVal = Math.round((q % 1) * 1000);
+      }
+    }
 
     if (field === 'productId') {
       const prod = productsList.find(p => p.id === value);
       if (prod) {
         newItems[index].unitPrice = (prod.basePrice / 100).toFixed(2);
         newItems[index].unit = prod.unit || 'pcs';
+        if (prod.unit === 'kg / gm') {
+          const q = Number(newItems[index].quantity || 1);
+          newItems[index].kgVal = Math.floor(q);
+          newItems[index].gmVal = Math.round((q % 1) * 1000);
+        }
       }
     }
     setCreateOrderForm(prev => ({ ...prev, items: newItems }));
@@ -819,15 +862,45 @@ const Orders = () => {
                             </select>
                           </td>
                           <td>
-                            <input
-                              type="number"
-                              required
-                              min="1"
-                              className="form-input"
-                              style={{ padding: '6px 8px', fontSize: '0.8rem', marginBottom: 0 }}
-                              value={item.quantity}
-                              onChange={e => handleCreateOrderItemChange(idx, 'quantity', e.target.value)}
-                            />
+                            {item.unit === 'kg / gm' ? (
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  placeholder="Kg"
+                                  value={item.kgVal !== undefined ? item.kgVal : Math.floor(item.quantity || 0)}
+                                  onChange={(e) => handleCreateOrderItemChange(idx, 'kg', e.target.value)}
+                                  className="form-input"
+                                  style={{ padding: '6px 6px', fontSize: '0.8rem', width: 50, marginBottom: 0 }}
+                                />
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="999"
+                                  placeholder="Gm"
+                                  value={item.gmVal !== undefined ? item.gmVal : Math.round(((item.quantity || 0) % 1) * 1000)}
+                                  onChange={(e) => handleCreateOrderItemChange(idx, 'gm', e.target.value)}
+                                  className="form-input"
+                                  style={{ padding: '6px 6px', fontSize: '0.8rem', width: 55, marginBottom: 0 }}
+                                />
+                              </div>
+                            ) : (
+                              <input
+                                type="number"
+                                required
+                                min="0.001"
+                                step="any"
+                                className="form-input"
+                                style={{ padding: '6px 8px', fontSize: '0.8rem', marginBottom: 0 }}
+                                value={item.quantity}
+                                onChange={e => handleCreateOrderItemChange(idx, 'quantity', e.target.value)}
+                              />
+                            )}
+                            {formatWeight(item.quantity, item.unit) && (
+                              <div style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 600, marginTop: 2 }}>
+                                = {formatWeight(item.quantity, item.unit)} ({item.quantity} kg)
+                              </div>
+                            )}
                           </td>
                           <td>
                             <select

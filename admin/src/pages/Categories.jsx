@@ -117,10 +117,10 @@ const Categories = () => {
     const ordered = [];
     rootCats.forEach(root => {
       ordered.push(root);
-      const directSubs = subCats.filter(sub => sub.parent_id === root.id);
+      const directSubs = subCats.filter(sub => String(sub.parent_id) === String(root.id));
       directSubs.forEach(sub => {
         ordered.push(sub);
-        const leafSubs = subCats.filter(leaf => leaf.parent_id === sub.id);
+        const leafSubs = subCats.filter(leaf => String(leaf.parent_id) === String(sub.id));
         leafSubs.forEach(leaf => {
           ordered.push(leaf);
         });
@@ -128,7 +128,7 @@ const Categories = () => {
     });
     
     flatCats.forEach(c => {
-      if (!ordered.find(o => o.id === c.id)) {
+      if (!ordered.find(o => String(o.id) === String(c.id))) {
         ordered.push(c);
       }
     });
@@ -373,14 +373,22 @@ const Categories = () => {
                     className="form-input"
                     value={form.parent_id}
                     onChange={e => setForm({ ...form, parent_id: e.target.value })}
+                    disabled={editItem && categories.some(c => String(c.parent_id) === String(editItem.id))}
                   >
                     <option value="">None (Top-level category)</option>
-                    {categories.filter(c => !editItem || String(c.id) !== String(editItem.id)).map(parent => (
-                      <option key={parent.id} value={parent.id}>
-                        {parent.name}
-                      </option>
-                    ))}
+                    {categories
+                      .filter(c => !c.parent_id && (!editItem || String(c.id) !== String(editItem.id)))
+                      .map(parent => (
+                        <option key={parent.id} value={parent.id}>
+                          {parent.name}
+                        </option>
+                      ))}
                   </select>
+                  {editItem && categories.some(c => String(c.parent_id) === String(editItem.id)) && (
+                    <p style={{ margin: '4px 0 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
+                      This category has subcategories, so it must remain a top-level category.
+                    </p>
+                  )}
                 </div>
 
                 <div className="form-group">

@@ -95,7 +95,23 @@ const Purchases = () => {
   // Item row change in Purchase form
   const handleItemChange = (index, field, value) => {
     const newItems = [...purchaseForm.items];
-    newItems[index][field] = field === 'quantity' || field === 'purchaseRate' ? Number(value) : value;
+
+    if (field === 'kg' || field === 'gm') {
+      if (field === 'kg') newItems[index].kgVal = value;
+      if (field === 'gm') newItems[index].gmVal = value;
+
+      const kgs = Number(field === 'kg' ? value : newItems[index].kgVal ?? Math.floor(newItems[index].quantity || 0));
+      const gms = Number(field === 'gm' ? value : newItems[index].gmVal ?? Math.round(((newItems[index].quantity || 0) % 1) * 1000));
+      newItems[index].quantity = Number((kgs + gms / 1000).toFixed(3));
+    } else {
+      newItems[index][field] = field === 'quantity' || field === 'purchaseRate' ? Number(value) : value;
+
+      if (field === 'unit' && value === 'kg / gm') {
+        const q = Number(newItems[index].quantity || 0);
+        newItems[index].kgVal = Math.floor(q);
+        newItems[index].gmVal = Math.round((q % 1) * 1000);
+      }
+    }
 
     // Auto populate default base price & unit if product selected
     if (field === 'productId') {
@@ -105,6 +121,11 @@ const Purchases = () => {
           newItems[index].purchaseRate = prod.basePrice || 0;
         }
         newItems[index].unit = prod.unit || 'pcs';
+        if (prod.unit === 'kg / gm') {
+          const q = Number(newItems[index].quantity || 1);
+          newItems[index].kgVal = Math.floor(q);
+          newItems[index].gmVal = Math.round((q % 1) * 1000);
+        }
       }
     }
     setPurchaseForm({ ...purchaseForm, items: newItems });
@@ -125,6 +146,28 @@ const Purchases = () => {
 
   const calculateTotal = () => {
     return purchaseForm.items.reduce((sum, item) => sum + (item.quantity * item.purchaseRate || 0), 0);
+  };
+
+  const formatWeight = (qty, unit) => {
+    const num = Number(qty);
+    if (!num || isNaN(num)) return '';
+    if (unit === 'kg' || unit === 'kg / gm') {
+      const totalGrams = Math.round(num * 1000);
+      const kgs = Math.floor(totalGrams / 1000);
+      const gms = totalGrams % 1000;
+      if (kgs > 0 && gms > 0) return `${kgs} kg ${gms} g`;
+      if (kgs > 0) return `${kgs} kg`;
+      if (gms > 0) return `${gms} g`;
+    }
+    if (unit === 'gm') {
+      const totalGrams = Math.round(num);
+      const kgs = Math.floor(totalGrams / 1000);
+      const gms = totalGrams % 1000;
+      if (kgs > 0 && gms > 0) return `${kgs} kg ${gms} g`;
+      if (kgs > 0) return `${kgs} kg`;
+      if (gms > 0) return `${gms} g`;
+    }
+    return '';
   };
 
   // Submit Purchase Voucher
@@ -614,7 +657,7 @@ const Purchases = () => {
                     marginBottom: 10
                   }}>
                     <div style={{ flex: 1 }}>Product Name</div>
-                    <div style={{ width: 150 }}>Qty / Unit</div>
+                    <div style={{ width: 210 }}>Qty / Unit</div>
                     <div style={{ width: 120 }}>Purchase Rate (₹)</div>
                     <div style={{ width: 100, textAlign: 'right' }}>Total Amount</div>
                     <div style={{ width: 28 }}></div>
@@ -648,31 +691,63 @@ const Purchases = () => {
                         </select>
                       </div>
 
-                      <div style={{ width: 150, display: 'flex', gap: 6 }}>
-                        <input
-                          type="number"
-                          min="1"
-                          placeholder="Qty"
-                          required
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
-                          className="form-input"
-                          style={{ padding: '6px 10px', fontSize: '0.8rem', width: 65 }}
-                        />
-                        <select
-                          value={item.unit || 'pcs'}
-                          onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
-                          className="form-select"
-                          style={{ padding: '6px 8px', fontSize: '0.8rem', flex: 1 }}
-                        >
-                          <option value="pcs">pcs</option>
-                          <option value="kg">kg</option>
-                          <option value="gm">gm</option>
-                          <option value="kg / gm">kg / gm</option>
-                          <option value="box">box</option>
-                          <option value="packet">packet</option>
-                          <option value="liter">liter</option>
-                        </select>
+                      <div style={{ width: 210, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                          {item.unit === 'kg / gm' ? (
+                            <div style={{ display: 'flex', gap: 4, flex: 1 }}>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="Kg"
+                                value={item.kgVal !== undefined ? item.kgVal : Math.floor(item.quantity || 0)}
+                                onChange={(e) => handleItemChange(idx, 'kg', e.target.value)}
+                                className="form-input"
+                                style={{ padding: '6px 6px', fontSize: '0.8rem', width: 50 }}
+                              />
+                              <input
+                                type="number"
+                                min="0"
+                                max="999"
+                                placeholder="Gm"
+                                value={item.gmVal !== undefined ? item.gmVal : Math.round(((item.quantity || 0) % 1) * 1000)}
+                                onChange={(e) => handleItemChange(idx, 'gm', e.target.value)}
+                                className="form-input"
+                                style={{ padding: '6px 6px', fontSize: '0.8rem', width: 55 }}
+                              />
+                            </div>
+                          ) : (
+                            <input
+                              type="number"
+                              min="0.001"
+                              step="any"
+                              placeholder="Qty"
+                              required
+                              value={item.quantity}
+                              onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
+                              className="form-input"
+                              style={{ padding: '6px 8px', fontSize: '0.8rem', width: 65 }}
+                            />
+                          )}
+                          <select
+                            value={item.unit || 'pcs'}
+                            onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
+                            className="form-select"
+                            style={{ padding: '6px 6px', fontSize: '0.8rem', width: 85 }}
+                          >
+                            <option value="pcs">pcs</option>
+                            <option value="kg">kg</option>
+                            <option value="gm">gm</option>
+                            <option value="kg / gm">kg / gm</option>
+                            <option value="box">box</option>
+                            <option value="packet">packet</option>
+                            <option value="liter">liter</option>
+                          </select>
+                        </div>
+                        {formatWeight(item.quantity, item.unit) && (
+                          <span style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 600 }}>
+                            = {formatWeight(item.quantity, item.unit)} ({item.quantity} kg)
+                          </span>
+                        )}
                       </div>
 
                       <div style={{ width: 120 }}>

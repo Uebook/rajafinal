@@ -261,11 +261,12 @@ export class ProductService {
       throw new AppError(400, 'Category not found', 'BAD_REQUEST');
     }
 
-    if (data.subCategoryId) {
+    const subCatId = data.subCategoryId && String(data.subCategoryId).trim() !== '' ? String(data.subCategoryId).trim() : null;
+    if (subCatId) {
       const [subCategory] = await db
         .select()
         .from(categories)
-        .where(and(eq(categories.id, data.subCategoryId), eq(categories.isDeleted, false)));
+        .where(and(eq(categories.id, subCatId), eq(categories.isDeleted, false)));
       if (!subCategory) {
         throw new AppError(400, 'Subcategory not found', 'BAD_REQUEST');
       }
@@ -289,7 +290,7 @@ export class ProductService {
           lowStockThreshold: data.lowStockThreshold !== undefined ? data.lowStockThreshold : 10,
           status: data.status || 'ACTIVE',
           categoryId: data.categoryId,
-          subCategoryId: data.subCategoryId || null,
+          subCategoryId: subCatId,
         })
         .returning();
 
@@ -492,8 +493,31 @@ export class ProductService {
       if (data.stockQty !== undefined) updatePayload.stockQty = data.stockQty;
       if (data.lowStockThreshold !== undefined) updatePayload.lowStockThreshold = data.lowStockThreshold;
       if (data.status !== undefined) updatePayload.status = data.status;
-      if (data.categoryId !== undefined) updatePayload.categoryId = data.categoryId;
-      if (data.subCategoryId !== undefined) updatePayload.subCategoryId = data.subCategoryId;
+      if (data.categoryId !== undefined) {
+        const [category] = await db
+          .select()
+          .from(categories)
+          .where(and(eq(categories.id, data.categoryId), eq(categories.isDeleted, false)));
+        if (!category) {
+          throw new AppError(400, 'Category not found', 'BAD_REQUEST');
+        }
+        updatePayload.categoryId = data.categoryId;
+      }
+      if (data.subCategoryId !== undefined) {
+        const subCatId = data.subCategoryId && String(data.subCategoryId).trim() !== '' ? String(data.subCategoryId).trim() : null;
+        if (subCatId) {
+          const [subCategory] = await db
+            .select()
+            .from(categories)
+            .where(and(eq(categories.id, subCatId), eq(categories.isDeleted, false)));
+          if (!subCategory) {
+            throw new AppError(400, 'Subcategory not found', 'BAD_REQUEST');
+          }
+          updatePayload.subCategoryId = subCatId;
+        } else {
+          updatePayload.subCategoryId = null;
+        }
+      }
 
       const [updated] = await tx
         .update(products)

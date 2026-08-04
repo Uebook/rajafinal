@@ -77,6 +77,15 @@ const Products = () => {
 
   const openEdit = (p) => {
     setEditItem(p);
+    let catId = p.category_id || '';
+    let subCatId = p.sub_category_id || '';
+
+    const catObj = categories.find(c => String(c.id) === String(catId));
+    if (catObj && catObj.parent_id) {
+      subCatId = catObj.id;
+      catId = catObj.parent_id;
+    }
+
     setForm({
       name: p.name,
       sku: p.sku,
@@ -89,8 +98,8 @@ const Products = () => {
       gst_rate: String(p.gst_rate),
       stock_qty: String(p.stock_qty),
       low_stock_threshold: String(p.low_stock_threshold),
-      category_id: p.category_id,
-      sub_category_id: p.sub_category_id || '',
+      category_id: catId,
+      sub_category_id: subCatId,
       unit: p.unit,
       image_url: p.images && p.images.length > 0 ? p.images[0].image_url : ''
     });
@@ -221,7 +230,7 @@ const Products = () => {
               {rootCategories.map(root => (
                 <React.Fragment key={root.id}>
                   <option value={root.id}>{root.name}</option>
-                  {categories.filter(c => c.parent_id === root.id).map(sub => (
+                  {categories.filter(c => String(c.parent_id) === String(root.id)).map(sub => (
                     <option key={sub.id} value={sub.id}>
                       {"\u00A0\u00A0└─ "}{sub.name}
                     </option>
@@ -290,8 +299,15 @@ const Products = () => {
                   </td>
                   <td>{p.sku}</td>
                   <td>
-                    {categories.find(c => c.id === p.category_id)?.name || '—'}
-                    {p.sub_category_id && ` └─ ${categories.find(c => c.id === p.sub_category_id)?.name || ''}`}
+                    {(() => {
+                      const mainCat = categories.find(c => String(c.id) === String(p.category_id));
+                      const subCat = categories.find(c => String(c.id) === String(p.sub_category_id));
+                      if (mainCat && mainCat.parent_id) {
+                        const parentCat = categories.find(c => String(c.id) === String(mainCat.parent_id));
+                        return `${parentCat?.name || ''} └─ ${mainCat.name}`;
+                      }
+                      return `${mainCat?.name || '—'}${subCat ? ` └─ ${subCat.name}` : ''}`;
+                    })()}
                   </td>
                   <td>{fmt(p.base_price)}</td>
                   <td>{p.vendor_price ? fmt(p.vendor_price) : '—'}</td>
@@ -404,7 +420,7 @@ const Products = () => {
                       required
                     >
                       <option value="">Select category</option>
-                      {categories.filter(c => !c.parent_id).map(c => (
+                      {rootCategories.map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>

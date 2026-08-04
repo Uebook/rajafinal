@@ -84,7 +84,7 @@ const Inventory = () => {
       gst_rate: Number(form.gst_rate),
       stock_qty: Number(form.stock_qty),
       low_stock_threshold: Number(form.low_stock_threshold),
-      sub_category_id: form.sub_category_id ? form.sub_category_id : null
+      sub_category_id: form.sub_category_id && form.sub_category_id.trim() !== '' ? form.sub_category_id.trim() : null
     };
     try {
       await api.post('/products', payload);
