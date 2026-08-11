@@ -41,11 +41,11 @@ const camelCaseMiddleware = (req: any, res: any, next: any) => {
 
 const cartAddSchema = z.object({
   productId: z.string().uuid('Invalid product ID'),
-  quantity: z.number().int().positive('Quantity must be positive'),
+  quantity: z.number().positive('Quantity must be positive'),
 });
 
 const cartItemUpdateSchema = z.object({
-  quantity: z.number().int().positive('Quantity must be positive'),
+  quantity: z.number().positive('Quantity must be positive'),
 });
 
 // Helper to get or create active cart for user

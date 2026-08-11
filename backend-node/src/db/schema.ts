@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { pgTable, pgEnum, varchar, index, foreignKey, uuid, jsonb, text, timestamp, boolean, uniqueIndex, integer, unique } from "drizzle-orm/pg-core"
+import { pgTable, pgEnum, varchar, index, foreignKey, uuid, jsonb, text, timestamp, boolean, uniqueIndex, integer, unique, doublePrecision } from "drizzle-orm/pg-core"
   import { sql } from "drizzle-orm"
 
 export const discount_type_enum = pgEnum("discount_type_enum", ['FLAT', 'PERCENTAGE'])
@@ -139,7 +139,7 @@ export const purchases = pgTable("purchases", {
 export const purchaseItems = pgTable("purchase_items", {
 	purchaseId: uuid("purchase_id").notNull().references(() => purchases.id, { onDelete: "cascade" }),
 	productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "restrict" }),
-	quantity: integer("quantity").notNull(),
+	quantity: doublePrecision("quantity").notNull(),
 	purchaseRate: integer("purchase_rate").notNull(),
 	totalAmount: integer("total_amount").notNull(),
 	unit: varchar("unit", { length: 50 }),
@@ -265,7 +265,7 @@ export const vendors = pgTable("vendors", {
 export const cartItems = pgTable("cart_items", {
 	cartId: uuid("cart_id").notNull().references(() => carts.id, { onDelete: "cascade" } ),
 	productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "restrict" } ),
-	quantity: integer("quantity").notNull(),
+	quantity: doublePrecision("quantity").notNull(),
 	price_snapshot: integer("price_snapshot").notNull(),
 	id: uuid("id").primaryKey().$defaultFn(() => crypto.randomUUID()).notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -352,7 +352,7 @@ export const orderItems = pgTable("order_items", {
 	orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" } ),
 	productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "restrict" } ),
 	productName: varchar("product_name", { length: 255 }).notNull(),
-	quantity: integer("quantity").notNull(),
+	quantity: doublePrecision("quantity").notNull(),
 	unitPrice: integer("unit_price").notNull(),
 	gstRate: integer("gst_rate").notNull(),
 	lineTotal: integer("line_total").notNull(),
@@ -535,7 +535,7 @@ export const products = pgTable("products", {
 	hsnCode: varchar("hsn_code", { length: 20 }),
 	basePrice: integer("base_price").notNull(),
 	gstRate: integer("gst_rate").default(18).notNull(),
-	stockQty: integer("stock_qty").default(0).notNull(),
+	stockQty: doublePrecision("stock_qty").default(0).notNull(),
 	lowStockThreshold: integer("low_stock_threshold").default(10).notNull(),
 	status: product_status_enum("status").default('ACTIVE').notNull(),
 	categoryId: uuid("category_id").notNull().references(() => categories.id, { onDelete: "restrict" } ),

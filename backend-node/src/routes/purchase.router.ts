@@ -17,7 +17,7 @@ const createSupplierSchema = z.object({
 
 const purchaseItemSchema = z.object({
   productId: z.string().uuid('Invalid product ID'),
-  quantity: z.number().int().positive('Quantity must be greater than 0'),
+  quantity: z.number().positive('Quantity must be greater than 0'),
   purchaseRate: z.number().nonnegative('Purchase rate must be >= 0'),
   unit: z.string().optional(),
 });

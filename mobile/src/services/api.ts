@@ -9,7 +9,7 @@ import { store } from '../store';
 import { logout, setTokens } from '../store/slices/authSlice';
 
 // Production Vercel backend endpoint
-const BASE_URL = 'https://backend-node-delta-seven.vercel.app/api/v1';
+const BASE_URL = 'https://backend.supplysetu.app/api/v1';
 
 export const api = axios.create({
   baseURL: BASE_URL,

@@ -87,8 +87,8 @@ const productSchema = z.object({
   hsnCode: z.string().optional(),
   basePrice: z.number().int().positive('Base price must be positive'),
   gstRate: z.number().int().nonnegative(),
-  stockQty: z.number().int().nonnegative().optional(),
-  lowStockThreshold: z.number().int().nonnegative().optional(),
+  stockQty: z.number().nonnegative().optional(),
+  lowStockThreshold: z.number().nonnegative().optional(),
   status: z.enum(['ACTIVE', 'HIDDEN']).optional(),
   categoryId: z.string(),
   subCategoryId: z.string().nullable().optional(),
@@ -98,7 +98,7 @@ const productSchema = z.object({
 });
 
 const stockAdjustmentSchema = z.object({
-  adjustment: z.number().int(),
+  adjustment: z.number(),
   reason: z.string().min(1, 'Adjustment reason is required'),
 });
 

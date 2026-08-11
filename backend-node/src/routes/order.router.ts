@@ -302,7 +302,7 @@ const adminOrderCreateSchema = z.object({
   deliveryAddress: z.string().min(1, 'Delivery address is required'),
   items: z.array(z.object({
     productId: z.string().uuid('Invalid product ID'),
-    quantity: z.number().int().positive('Quantity must be greater than 0'),
+    quantity: z.number().positive('Quantity must be greater than 0'),
     unitPrice: z.number().int().positive('Price must be greater than 0').optional(), // price in paise
     unit: z.string().optional(),
   })).min(1, 'At least one item is required'),

@@ -1,7 +1,12 @@
 import { Router } from 'express';
-import { getCurrentUser, requireAdmin } from '../middleware/auth.js';
+import { getCurrentUser, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
 import { AdminService } from '../services/admin.service.js';
 import { z } from 'zod';
+import { db } from '../db/index.js';
+import { suppliers, ledgerEntries, users, retailers } from '../db/schema.js';
+import { eq, and, desc, sql } from 'drizzle-orm';
+import crypto from 'crypto';
+import { AppError } from '../utils/errors.js';
 
 const router = Router();
 const adminService = new AdminService();
@@ -121,17 +126,189 @@ router.get('/notifications', getCurrentUser as any, requireAdmin as any, async (
   }
 });
 
-// ── Notifications: Send ─────────────────────────────────────
-router.post('/notifications/send', getCurrentUser as any, requireAdmin as any, async (req: any, res, next) => {
+// ── Unified Accounting Vouchers: Create ──────────────────────
+const voucherCreateSchema = z.object({
+  voucherType: z.enum(['PAYMENT', 'RECEIPT', 'DEBIT_NOTE', 'CREDIT_NOTE']),
+  partyType: z.enum(['RETAILER', 'SUPPLIER']),
+  partyId: z.string().uuid(),
+  amount: z.number().int().positive('Amount must be positive'), // in paise
+  description: z.string().optional(),
+  date: z.string().optional(), // optional date string
+});
+
+router.post('/vouchers', getCurrentUser as any, requireAdmin as any, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const payload = sendNotificationSchema.parse(req.body);
-    const result = await adminService.sendNotification(
-      payload.title,
-      payload.body,
-      payload.target_audience,
-      req.user!.id
-    );
+    const payload = voucherCreateSchema.parse(req.body);
+    const adminUserId = req.user!.id;
+    const createdAtDate = payload.date ? new Date(payload.date) : new Date();
+
+    const result = await db.transaction(async (tx) => {
+      let debitAccount = '';
+      let creditAccount = '';
+      let entryType: 'DEBIT' | 'CREDIT' = 'DEBIT';
+      let userId = adminUserId;
+      let refType = 'MANUAL_VOUCHER';
+      let refId = crypto.randomUUID();
+
+      if (payload.partyType === 'SUPPLIER') {
+        const [supplier] = await tx.select().from(suppliers).where(and(eq(suppliers.id, payload.partyId), eq(suppliers.isDeleted, false)));
+        if (!supplier) {
+          throw new AppError(404, 'Supplier not found', 'NOT_FOUND');
+        }
+
+        // Supplier balance adjustment:
+        // PAYMENT (we pay them) -> decreases what we owe them
+        // RECEIPT (they pay us refund) -> decreases what we owe them
+        // DEBIT_NOTE (purchase return / debit them) -> decreases what we owe them
+        // CREDIT_NOTE (credit them) -> increases what we owe them
+        let adjustment = 0;
+        if (payload.voucherType === 'PAYMENT' || payload.voucherType === 'RECEIPT' || payload.voucherType === 'DEBIT_NOTE') {
+          adjustment = -payload.amount;
+        } else if (payload.voucherType === 'CREDIT_NOTE') {
+          adjustment = payload.amount;
+        }
+
+        const newBalance = Math.max(0, supplier.balance + adjustment);
+        await tx.update(suppliers).set({ balance: newBalance, updatedAt: new Date() }).where(eq(suppliers.id, supplier.id));
+
+        // Set accounts for double entry:
+        if (payload.voucherType === 'PAYMENT') {
+          debitAccount = `Supplier: ${supplier.name}`;
+          creditAccount = 'Cash/Bank Account';
+          entryType = 'CREDIT'; // credit cash/bank
+        } else if (payload.voucherType === 'RECEIPT') {
+          debitAccount = 'Cash/Bank Account';
+          creditAccount = `Supplier: ${supplier.name}`;
+          entryType = 'DEBIT'; // debit cash/bank
+        } else if (payload.voucherType === 'DEBIT_NOTE') {
+          debitAccount = `Supplier: ${supplier.name}`;
+          creditAccount = 'Purchase Return Account';
+          entryType = 'DEBIT';
+        } else if (payload.voucherType === 'CREDIT_NOTE') {
+          debitAccount = 'Purchase Account';
+          creditAccount = `Supplier: ${supplier.name}`;
+          entryType = 'CREDIT';
+        }
+
+        const ledgerId = crypto.randomUUID();
+        const [inserted] = await tx.insert(ledgerEntries).values({
+          id: ledgerId,
+          userId: adminUserId,
+          entryType,
+          amount: payload.amount,
+          referenceType: refType,
+          referenceId: refId,
+          description: payload.description || `${payload.voucherType} voucher posted for Supplier ${supplier.name}`,
+          voucherType: payload.voucherType,
+          debitAccount,
+          creditAccount,
+          createdAt: createdAtDate,
+          updatedAt: new Date(),
+        } as any).returning();
+
+        return inserted;
+
+      } else {
+        // RETAILER
+        const [retailer] = await tx.select().from(retailers).where(and(eq(retailers.id, payload.partyId), eq(retailers.isDeleted, false)));
+        if (!retailer) {
+          throw new AppError(404, 'Retailer not found', 'NOT_FOUND');
+        }
+        const [usr] = await tx.select().from(users).where(eq(users.id, retailer.userId));
+        const partyName = usr ? usr.fullName : 'Retailer';
+        userId = retailer.userId;
+
+        // Set accounts for double entry:
+        if (payload.voucherType === 'RECEIPT') {
+          debitAccount = 'Cash/Bank Account';
+          creditAccount = `Retailer: ${partyName}`;
+          entryType = 'CREDIT'; // credit customer to reduce balance
+        } else if (payload.voucherType === 'PAYMENT') {
+          debitAccount = `Retailer: ${partyName}`;
+          creditAccount = 'Cash/Bank Account';
+          entryType = 'DEBIT'; // debit customer to increase balance
+        } else if (payload.voucherType === 'DEBIT_NOTE') {
+          debitAccount = `Retailer: ${partyName}`;
+          creditAccount = 'Interest/Charges Account';
+          entryType = 'DEBIT';
+        } else if (payload.voucherType === 'CREDIT_NOTE') {
+          debitAccount = 'Sales Return/Discount Account';
+          creditAccount = `Retailer: ${partyName}`;
+          entryType = 'CREDIT';
+        }
+
+        const ledgerId = crypto.randomUUID();
+        const [inserted] = await tx.insert(ledgerEntries).values({
+          id: ledgerId,
+          userId: retailer.userId,
+          entryType,
+          amount: payload.amount,
+          referenceType: refType,
+          referenceId: refId,
+          description: payload.description || `${payload.voucherType} voucher posted for Customer ${partyName}`,
+          voucherType: payload.voucherType,
+          debitAccount,
+          creditAccount,
+          createdAt: createdAtDate,
+          updatedAt: new Date(),
+        } as any).returning();
+
+        return inserted;
+      }
+    });
+
     return res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── Supplier Ledger entries ───────────────────────────────────
+router.get('/suppliers/:supplierId/ledger', getCurrentUser as any, requireAdmin as any, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { supplierId } = req.params;
+    
+    // 1. Fetch supplier
+    const [supplier] = await db.select().from(suppliers).where(and(eq(suppliers.id, supplierId), eq(suppliers.isDeleted, false)));
+    if (!supplier) {
+      throw new AppError(404, 'Supplier not found', 'NOT_FOUND');
+    }
+
+    // 2. Fetch all ledger entries that match the supplier's name
+    const supplierAccountName = `Supplier: ${supplier.name}`;
+    
+    const list = await db.select()
+      .from(ledgerEntries)
+      .where(
+        and(
+          eq(ledgerEntries.isDeleted, false),
+          sql`${ledgerEntries.debitAccount} = ${supplierAccountName} OR ${ledgerEntries.creditAccount} = ${supplierAccountName}`
+        )
+      )
+      .orderBy(desc(ledgerEntries.createdAt));
+
+    // Map entries to standard format
+    const entries = list.map((e) => {
+      const isDebit = e.debitAccount === supplierAccountName;
+      
+      return {
+        id: e.id,
+        entry_type: isDebit ? 'debit' : 'credit',
+        amount: e.amount,
+        reference_type: e.referenceType,
+        reference_id: e.referenceId,
+        description: e.description,
+        voucher_type: e.voucherType,
+        created_at: e.createdAt,
+      };
+    });
+
+    return res.status(200).json({
+      outstanding_balance: supplier.balance,
+      available_balance: 0,
+      credit_limit: 0,
+      entries,
+    });
   } catch (error) {
     next(error);
   }
