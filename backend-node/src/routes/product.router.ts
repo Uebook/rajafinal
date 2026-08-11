@@ -118,11 +118,15 @@ router.post('/upload', getCurrentUser as any, upload.single('file'), async (req,
     `);
 
     const hostHeader = req.get('x-forwarded-host') || req.get('host');
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-    const backendUrl = process.env.BACKEND_URL || (process.env.VERCEL ? `${protocol}://${hostHeader}` : 'http://localhost:8000');
+    const forwardedProto = req.get('x-forwarded-proto');
+    let protocol = (forwardedProto && (forwardedProto as string).split(',')[0].trim()) || req.protocol;
+    if (hostHeader && hostHeader.includes('supplysetu.app')) {
+      protocol = 'https';
+    }
+    const backendUrl = process.env.BACKEND_URL || `${protocol}://${hostHeader}`;
     const cleanUrl = backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl;
     const imageUrl = `${cleanUrl}/uploads/${filename}`;
-    return res.status(200).json({ image_url: imageUrl });
+    return res.status(200).json({ image_url: imageUrl, url: imageUrl });
   } catch (error) {
     next(error);
   }

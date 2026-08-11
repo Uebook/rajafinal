@@ -113,9 +113,10 @@ const Products = () => {
     formData.append('file', file);
     try {
       const { data } = await api.post('/upload', formData, {
-        headers: { 'Content-Type': undefined }
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
-      setForm(prev => ({ ...prev, image_url: data.image_url }));
+      const uploadedUrl = data.image_url || data.url;
+      setForm(prev => ({ ...prev, image_url: uploadedUrl }));
     } catch (err) {
       alert('Failed to upload image: ' + (err.response?.data?.message || err.response?.data?.detail || err.message));
     }
