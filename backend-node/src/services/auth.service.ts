@@ -322,19 +322,21 @@ export class AuthService {
         .insert(users)
         .values({
           mobile: data.mobile,
+          email: data.email || null,
           fullName: data.owner_name,
           role: 'RETAILER',
-          status: 'PENDING',
+          status: 'ACTIVE',
           isVerified: false,
+          passwordHash: data.password ? hashPassword(data.password) : null,
           geoLocation: data.geo_location || null,
         })
         .returning();
 
       await tx.insert(retailers).values({
         userId: user.id,
-        businessName: data.business_name,
+        businessName: data.business_name || data.owner_name,
         ownerName: data.owner_name,
-        businessType: data.business_type || null,
+        businessType: data.business_type || 'Customer',
         gstNumber: data.gst_number || null,
         address: data.address || null,
         city: data.city || null,
@@ -435,5 +437,25 @@ export class AuthService {
       .returning();
 
     return updatedRetailer;
+  }
+
+  async updateVendorCreditLimit(userId: string, newLimit: number) {
+    const [vendor] = await db
+      .select()
+      .from(vendors)
+      .where(and(eq(vendors.userId, userId), eq(vendors.isDeleted, false)))
+      .limit(1);
+
+    if (!vendor) {
+      throw new AppError(400, 'Vendor profile not found', 'BAD_REQUEST');
+    }
+
+    const [updatedVendor] = await db
+      .update(vendors)
+      .set({ creditLimit: newLimit, updatedAt: new Date() })
+      .where(eq(vendors.userId, userId))
+      .returning();
+
+    return updatedVendor;
   }
 }

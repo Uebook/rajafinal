@@ -156,18 +156,16 @@ const ProfileScreen: React.FC = () => {
     .toUpperCase() || 'U';
 
   const businessName =
-    user?.retailer_profile?.business_name ||
-    user?.vendor_profile?.business_name ||
     user?.full_name ||
-    'Maitreyi Enterprise';
+    user?.retailer_profile?.owner_name ||
+    user?.vendor_profile?.business_name ||
+    'Customer';
 
   const gstNumber =
-    user?.retailer_profile?.gst_number ||
-    user?.vendor_profile?.gst_number ||
-    '27AAAAA0000A1Z5';
+    user?.vendor_profile?.gst_number || '';
 
   const roleLabel =
-    user?.role === 'retailer' ? 'Premium Retailer • Mumbai, IN' : 'Verified Vendor • India';
+    user?.role === 'vendor' ? 'Verified Vendor • India' : 'Customer Account';
 
   const gstStatus = user?.status === 'active' || user?.is_verified ? 'Verified' : 'Pending';
 
@@ -203,15 +201,27 @@ const ProfileScreen: React.FC = () => {
 
         {/* Horizontal Status Cards Row */}
         <View style={styles.cardsRow}>
-          {/* Card 1: GST Status */}
-          <View style={[styles.statusCard, styles.gstCardBorder]}>
-            <Text style={styles.cardHeaderLabel}>GST STATUS</Text>
-            <View style={styles.statusValueRow}>
-              <CheckCircle2 size={16} color={Colors.success} />
-              <Text style={styles.cardStatusValue}>{gstStatus}</Text>
+          {user?.role === 'vendor' ? (
+            /* Card 1: GST Status for Vendor */
+            <View style={[styles.statusCard, styles.gstCardBorder]}>
+              <Text style={styles.cardHeaderLabel}>GST STATUS</Text>
+              <View style={styles.statusValueRow}>
+                <CheckCircle2 size={16} color={Colors.success} />
+                <Text style={styles.cardStatusValue}>{gstStatus}</Text>
+              </View>
+              <Text style={styles.cardDetailText}>{gstNumber || 'GST Verified'}</Text>
             </View>
-            <Text style={styles.cardDetailText}>{gstNumber}</Text>
-          </View>
+          ) : (
+            /* Card 1: Account Status for Customer */
+            <View style={[styles.statusCard, styles.gstCardBorder]}>
+              <Text style={styles.cardHeaderLabel}>ACCOUNT STATUS</Text>
+              <View style={styles.statusValueRow}>
+                <CheckCircle2 size={16} color={Colors.success} />
+                <Text style={styles.cardStatusValue}>Active</Text>
+              </View>
+              <Text style={styles.cardDetailText}>Verified Customer</Text>
+            </View>
+          )}
 
           {/* Card 2: Member Tier */}
           <View style={[styles.statusCard, styles.tierCardBorder]}>
@@ -220,7 +230,7 @@ const ProfileScreen: React.FC = () => {
               <Star size={16} color="#E8C349" fill="#E8C349" />
               <Text style={styles.cardStatusValueBlack}>Gold Elite</Text>
             </View>
-            <Text style={styles.cardDetailText}>Since June 2021</Text>
+            <Text style={styles.cardDetailText}>Active Member</Text>
           </View>
         </View>
 
@@ -228,7 +238,7 @@ const ProfileScreen: React.FC = () => {
         <View style={styles.preferencesSection}>
           <Text style={styles.preferencesHeading}>PREFERENCES</Text>
 
-          {/* Business Settings */}
+          {/* Account Settings */}
           <TouchableOpacity
             style={styles.prefItem}
             onPress={() => setModalVisible(true)}
@@ -237,9 +247,10 @@ const ProfileScreen: React.FC = () => {
               <Settings size={18} color={Colors.textSecondary} />
             </View>
             <View style={styles.prefTextWrap}>
-              <Text style={styles.prefItemTitle}>Business Settings</Text>
-              <Text style={styles.prefItemSub}>Manage addresses and billing</Text>
+              <Text style={styles.prefItemTitle}>{user?.role === 'vendor' ? 'Business Settings' : 'Account Settings'}</Text>
+              <Text style={styles.prefItemSub}>Manage profile and details</Text>
             </View>
+
             <ChevronRight size={18} color={Colors.textMuted} />
           </TouchableOpacity>
 
@@ -301,29 +312,33 @@ const ProfileScreen: React.FC = () => {
         onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Edit Business Settings</Text>
+            <Text style={styles.modalTitle}>{user?.role === 'vendor' ? 'Edit Business Settings' : 'Edit Account Settings'}</Text>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Owner Name</Text>
+              <Text style={styles.inputLabel}>{user?.role === 'vendor' ? 'Owner Name' : 'Full Name'}</Text>
               <TextInput
                 style={styles.textInput}
                 value={fullName}
                 onChangeText={setFullName}
-                placeholder="Enter owner name"
+                placeholder="Enter name"
                 placeholderTextColor={Colors.textMuted}
               />
             </View>
 
-            {/* Read-only Business Details */}
-            <View style={styles.readOnlyGroup}>
-              <Text style={styles.inputLabel}>Business Name (Verified)</Text>
-              <Text style={styles.readOnlyText}>{businessName}</Text>
-            </View>
+            {user?.role === 'vendor' && (
+              <>
+                <View style={styles.readOnlyGroup}>
+                  <Text style={styles.inputLabel}>Business Name (Verified)</Text>
+                  <Text style={styles.readOnlyText}>{businessName}</Text>
+                </View>
 
-            <View style={styles.readOnlyGroup}>
-              <Text style={styles.inputLabel}>GST Number (Verified)</Text>
-              <Text style={styles.readOnlyText}>{gstNumber}</Text>
-            </View>
+                <View style={styles.readOnlyGroup}>
+                  <Text style={styles.inputLabel}>GST Number (Verified)</Text>
+                  <Text style={styles.readOnlyText}>{gstNumber}</Text>
+                </View>
+              </>
+            )}
+
 
             <View style={styles.modalButtonsRow}>
               <TouchableOpacity

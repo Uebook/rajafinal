@@ -128,7 +128,19 @@ router.get('/notifications', getCurrentUser as any, requireAdmin as any, async (
 
 // ── Unified Accounting Vouchers: Create ──────────────────────
 const voucherCreateSchema = z.object({
-  voucherType: z.enum(['PAYMENT', 'RECEIPT', 'DEBIT_NOTE', 'CREDIT_NOTE']),
+  voucherType: z.enum([
+    'PAYMENT',
+    'RECEIPT',
+    'DEBIT_NOTE',
+    'CREDIT_NOTE',
+    'CREDIT_NOTE_CUSTOMER',
+    'DEBIT_NOTE_SUPPLIER',
+    'PAYMENT_RECEIVE',
+    'SUPPLIER_PAYMENT',
+    'CUSTOMER_DUE_ENTRY',
+    'SUPPLIER_DUE_ENTRY',
+    'CUSTOMER_DUE_PAID',
+  ]),
   partyType: z.enum(['RETAILER', 'SUPPLIER']),
   partyId: z.string().uuid(),
   amount: z.number().int().positive('Amount must be positive'), // in paise
@@ -156,36 +168,38 @@ router.post('/vouchers', getCurrentUser as any, requireAdmin as any, async (req:
           throw new AppError(404, 'Supplier not found', 'NOT_FOUND');
         }
 
-        // Supplier balance adjustment:
-        // PAYMENT (we pay them) -> decreases what we owe them
-        // RECEIPT (they pay us refund) -> decreases what we owe them
-        // DEBIT_NOTE (purchase return / debit them) -> decreases what we owe them
-        // CREDIT_NOTE (credit them) -> increases what we owe them
+        // Supplier balance adjustment logic
         let adjustment = 0;
-        if (payload.voucherType === 'PAYMENT' || payload.voucherType === 'RECEIPT' || payload.voucherType === 'DEBIT_NOTE') {
-          adjustment = -payload.amount;
-        } else if (payload.voucherType === 'CREDIT_NOTE') {
-          adjustment = payload.amount;
+        const vType = payload.voucherType;
+
+        if (vType === 'PAYMENT' || vType === 'RECEIPT' || vType === 'DEBIT_NOTE' || vType === 'DEBIT_NOTE_SUPPLIER' || vType === 'SUPPLIER_PAYMENT') {
+          adjustment = -payload.amount; // reduces payable balance owed to supplier
+        } else if (vType === 'CREDIT_NOTE' || vType === 'SUPPLIER_DUE_ENTRY') {
+          adjustment = payload.amount; // increases payable balance owed to supplier
         }
 
         const newBalance = Math.max(0, supplier.balance + adjustment);
         await tx.update(suppliers).set({ balance: newBalance, updatedAt: new Date() }).where(eq(suppliers.id, supplier.id));
 
         // Set accounts for double entry:
-        if (payload.voucherType === 'PAYMENT') {
+        if (vType === 'PAYMENT' || vType === 'SUPPLIER_PAYMENT') {
           debitAccount = `Supplier: ${supplier.name}`;
           creditAccount = 'Cash/Bank Account';
           entryType = 'CREDIT'; // credit cash/bank
-        } else if (payload.voucherType === 'RECEIPT') {
+        } else if (vType === 'RECEIPT') {
           debitAccount = 'Cash/Bank Account';
           creditAccount = `Supplier: ${supplier.name}`;
           entryType = 'DEBIT'; // debit cash/bank
-        } else if (payload.voucherType === 'DEBIT_NOTE') {
+        } else if (vType === 'DEBIT_NOTE' || vType === 'DEBIT_NOTE_SUPPLIER') {
           debitAccount = `Supplier: ${supplier.name}`;
-          creditAccount = 'Purchase Return Account';
+          creditAccount = 'Purchase Return / Debit Note Account';
           entryType = 'DEBIT';
-        } else if (payload.voucherType === 'CREDIT_NOTE') {
+        } else if (vType === 'CREDIT_NOTE') {
           debitAccount = 'Purchase Account';
+          creditAccount = `Supplier: ${supplier.name}`;
+          entryType = 'CREDIT';
+        } else if (vType === 'SUPPLIER_DUE_ENTRY') {
+          debitAccount = 'Opening Balance / Adjustment Account';
           creditAccount = `Supplier: ${supplier.name}`;
           entryType = 'CREDIT';
         }
@@ -197,9 +211,9 @@ router.post('/vouchers', getCurrentUser as any, requireAdmin as any, async (req:
           entryType,
           amount: payload.amount,
           referenceType: refType,
-          referenceId: refId,
-          description: payload.description || `${payload.voucherType} voucher posted for Supplier ${supplier.name}`,
-          voucherType: payload.voucherType,
+          referenceId: supplier.id,
+          description: payload.description || `${vType} voucher posted for Supplier ${supplier.name}`,
+          voucherType: vType,
           debitAccount,
           creditAccount,
           createdAt: createdAtDate,
@@ -209,32 +223,42 @@ router.post('/vouchers', getCurrentUser as any, requireAdmin as any, async (req:
         return inserted;
 
       } else {
-        // RETAILER
-        const [retailer] = await tx.select().from(retailers).where(and(eq(retailers.id, payload.partyId), eq(retailers.isDeleted, false)));
+        // RETAILER (CUSTOMER)
+        let retailer = (await tx.select().from(retailers).where(and(eq(retailers.id, payload.partyId), eq(retailers.isDeleted, false))))[0];
         if (!retailer) {
-          throw new AppError(404, 'Retailer not found', 'NOT_FOUND');
+          // If passed partyId is userId directly
+          retailer = (await tx.select().from(retailers).where(and(eq(retailers.userId, payload.partyId), eq(retailers.isDeleted, false))))[0];
         }
+        if (!retailer) {
+          throw new AppError(404, 'Customer (Retailer) not found', 'NOT_FOUND');
+        }
+
         const [usr] = await tx.select().from(users).where(eq(users.id, retailer.userId));
         const partyName = usr ? usr.fullName : 'Retailer';
         userId = retailer.userId;
+        const vType = payload.voucherType;
 
         // Set accounts for double entry:
-        if (payload.voucherType === 'RECEIPT') {
+        if (vType === 'RECEIPT' || vType === 'PAYMENT_RECEIVE' || vType === 'CUSTOMER_DUE_PAID') {
           debitAccount = 'Cash/Bank Account';
           creditAccount = `Retailer: ${partyName}`;
-          entryType = 'CREDIT'; // credit customer to reduce balance
-        } else if (payload.voucherType === 'PAYMENT') {
+          entryType = 'CREDIT'; // credit customer to reduce due balance
+        } else if (vType === 'PAYMENT') {
           debitAccount = `Retailer: ${partyName}`;
           creditAccount = 'Cash/Bank Account';
           entryType = 'DEBIT'; // debit customer to increase balance
-        } else if (payload.voucherType === 'DEBIT_NOTE') {
+        } else if (vType === 'DEBIT_NOTE') {
           debitAccount = `Retailer: ${partyName}`;
           creditAccount = 'Interest/Charges Account';
           entryType = 'DEBIT';
-        } else if (payload.voucherType === 'CREDIT_NOTE') {
-          debitAccount = 'Sales Return/Discount Account';
+        } else if (vType === 'CREDIT_NOTE' || vType === 'CREDIT_NOTE_CUSTOMER') {
+          debitAccount = 'Sales Return / Discount Account';
           creditAccount = `Retailer: ${partyName}`;
           entryType = 'CREDIT';
+        } else if (vType === 'CUSTOMER_DUE_ENTRY') {
+          debitAccount = `Retailer: ${partyName}`;
+          creditAccount = 'Opening Balance / Adjustment Account';
+          entryType = 'DEBIT'; // debit customer to record outstanding due
         }
 
         const ledgerId = crypto.randomUUID();
@@ -245,8 +269,8 @@ router.post('/vouchers', getCurrentUser as any, requireAdmin as any, async (req:
           amount: payload.amount,
           referenceType: refType,
           referenceId: refId,
-          description: payload.description || `${payload.voucherType} voucher posted for Customer ${partyName}`,
-          voucherType: payload.voucherType,
+          description: payload.description || `${vType} voucher posted for Customer ${partyName}`,
+          voucherType: vType,
           debitAccount,
           creditAccount,
           createdAt: createdAtDate,

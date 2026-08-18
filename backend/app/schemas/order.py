@@ -54,7 +54,7 @@ class OrderCreateRequest(BaseModel):
 
 
 class OrderStatusUpdate(BaseModel):
-    status: str = Field(..., pattern="^(confirmed|dispatched|delivered|cancelled)$")
+    status: str = Field(..., pattern="^(pending|confirmed|dispatched|delivered|cancelled|returned)$")
 
 
 class OrderItemResponse(BaseModel):

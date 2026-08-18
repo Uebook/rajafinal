@@ -16,75 +16,52 @@ import { Colors, Typography, Spacing, Radius, Shadow } from '../../theme';
 interface Props { navigation: NativeStackNavigationProp<any> }
 
 interface FormData {
-  business_name: string;
-  owner_name: string;
+  name: string;
+  email: string;
   mobile: string;
-  business_type: string;
-  gst_number: string;
-  city: string;
-  state: string;
+  password: string;
+  address: string;
 }
 
 const steps = [
-  { label: 'Business Details', active: true },
+  { label: 'Customer Details', active: true },
   { label: 'OTP Verification', active: false },
   { label: 'Access Granted', active: false },
 ];
 
 const RetailerRegisterScreen: React.FC<Props> = ({ navigation }) => {
   const dispatch = useAppDispatch();
-  const [step, setStep] = useState<'form' | 'otp'>('form');
   const [form, setForm] = useState<FormData>({
-    business_name: '', owner_name: '', mobile: '',
-    business_type: 'General Store', gst_number: '', city: '', state: '',
+    name: '', email: '', mobile: '', password: '', address: '',
   });
-  const [otp, setOtp] = useState('');
-  const [timer, setTimer] = useState(0);
   const [loading, setLoading] = useState(false);
 
   const update = (key: keyof FormData, val: string) => setForm(f => ({ ...f, [key]: val }));
 
-  const startTimer = () => {
-    setTimer(60);
-    const interval = setInterval(() => {
-      setTimer(prev => { if (prev <= 1) { clearInterval(interval); return 0; } return prev - 1; });
-    }, 1000);
-  };
-
   const handleRegister = async () => {
-    if (!form.business_name || !form.owner_name || !form.mobile || form.mobile.length < 10) {
-      Alert.alert('Error', 'Please fill all required fields');
+    if (!form.name || !form.mobile || form.mobile.length < 10) {
+      Alert.alert('Error', 'Please enter your name and 10-digit mobile number');
       return;
     }
     setLoading(true);
     try {
-      await api.post('/retailer/auth/register', { ...form, mobile: `+91${form.mobile}` });
-      setStep('otp');
-      startTimer();
-    } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.detail || 'Registration failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerify = async () => {
-    if (otp.length !== 6) { Alert.alert('Error', 'Enter 6-digit OTP'); return; }
-    setLoading(true);
-    try {
-      const res = await api.post('/retailer/auth/otp/verify', {
+      const res = await api.post('/retailer/auth/register', {
+        owner_name: form.name,
+        business_name: form.name,
+        email: form.email,
         mobile: `+91${form.mobile}`,
-        otp,
-        purpose: 'register',
+        password: form.password,
+        address: form.address,
       });
-      const profile = await api.get('/me', { headers: { Authorization: `Bearer ${res.data.access_token}` } });
+
+      const { access_token, refresh_token, user } = res.data;
       dispatch(setCredentials({
-        accessToken: res.data.access_token,
-        refreshToken: res.data.refresh_token,
-        user: { ...profile.data, role: 'retailer' },
+        accessToken: access_token,
+        refreshToken: refresh_token,
+        user: { ...user, role: 'retailer' },
       }));
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.detail || 'OTP verification failed');
+      Alert.alert('Error', err.response?.data?.detail || err.response?.data?.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -93,7 +70,7 @@ const RetailerRegisterScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <TouchableOpacity onPress={() => step === 'otp' ? setStep('form') : navigation.goBack()} activeOpacity={0.7}>
+        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Text style={styles.back}>← Back</Text>
         </TouchableOpacity>
 
@@ -101,84 +78,45 @@ const RetailerRegisterScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.heroBadge}>
             <Store size={18} color={Colors.primaryDark} />
           </View>
-          <Text style={styles.heroTitle}>Retailer Registration</Text>
-          <Text style={styles.heroSubtitle}>Help us build your business profile for curated inventory, offers, and quick onboarding.</Text>
+          <Text style={styles.heroTitle}>Customer Registration</Text>
+          <Text style={styles.heroSubtitle}>Create your customer account to browse catalog, place orders, and manage your account.</Text>
         </View>
 
-        <View style={styles.stepperRow}>
-          <View style={styles.stepperLine} />
-          {steps.map((item, index) => {
-            const isActive = step === 'form' ? index === 0 : index === 1;
-            return (
-              <View key={item.label} style={styles.stepItem}>
-                <View style={[styles.stepCircle, isActive && styles.stepCircleActive]}>
-                  <Text style={[styles.stepNumber, isActive && styles.stepNumberActive]}>{index + 1}</Text>
-                </View>
-                <Text style={[styles.stepText, isActive && styles.stepTextActive]} numberOfLines={2}>{item.label}</Text>
-              </View>
-            );
-          })}
-        </View>
-
-        <Text style={styles.sectionTitle}>{step === 'form' ? 'Business Details' : 'Verify OTP'}</Text>
+        <Text style={styles.sectionTitle}>Customer Details</Text>
 
         <View style={styles.formCard}>
-          {step === 'form' ? (
-            <>
-              <Input label="Business Name *" value={form.business_name} onChangeText={t => update('business_name', t)} placeholder="Raja General Store" containerStyle={styles.field} />
-              <Input label="Owner Name *" value={form.owner_name} onChangeText={t => update('owner_name', t)} placeholder="Rajesh Kumar" containerStyle={styles.field} />
-              <View style={styles.field}>
-                <Text style={styles.inputLabel}>Mobile Number *</Text>
-                <View style={styles.phoneRow}>
-                  <View style={styles.prefix}><Text style={styles.prefixText}>+91</Text></View>
-                  <Input
-                    value={form.mobile}
-                    onChangeText={t => update('mobile', t.replace(/\D/g, '').slice(0, 10))}
-                    keyboardType="number-pad"
-                    placeholder="9876543210"
-                    style={styles.phoneInput}
-                    containerStyle={{ marginBottom: 0, flex: 1 }}
-                  />
-                </View>
-              </View>
-              <Input label="Business Type" value={form.business_type} onChangeText={t => update('business_type', t)} placeholder="General Store" containerStyle={styles.field} />
-              <Input label="GST Number (optional)" value={form.gst_number} onChangeText={t => update('gst_number', t.toUpperCase())} placeholder="29AADCB2230M1ZP" containerStyle={styles.field} />
-              <Input label="City" value={form.city} onChangeText={t => update('city', t)} placeholder="Mumbai" containerStyle={styles.field} />
-              <Input label="State" value={form.state} onChangeText={t => update('state', t)} placeholder="Maharashtra" containerStyle={styles.field} />
-              <Button
-                label="Continue"
-                onPress={handleRegister}
-                loading={loading}
-                icon={<ArrowRight size={18} color={Colors.white} />}
-                style={styles.ctaButton}
+          <Input label="Full Name *" value={form.name} onChangeText={t => update('name', t)} placeholder="Rajesh Kumar" containerStyle={styles.field} />
+          <Input label="Email Address" value={form.email} onChangeText={t => update('email', t)} keyboardType="email-address" autoCapitalize="none" placeholder="rajesh@example.com" containerStyle={styles.field} />
+          <View style={styles.field}>
+            <Text style={styles.inputLabel}>Mobile Number *</Text>
+            <View style={styles.phoneRow}>
+              <View style={styles.prefix}><Text style={styles.prefixText}>+91</Text></View>
+              <Input
+                value={form.mobile}
+                onChangeText={t => update('mobile', t.replace(/\D/g, '').slice(0, 10))}
+                keyboardType="number-pad"
+                placeholder="9876543210"
+                style={styles.phoneInput}
+                containerStyle={{ marginBottom: 0, flex: 1 }}
               />
-              <Text style={styles.disclaimer}>By continuing, you agree to our Terms of Service and Privacy Policy.</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.otpIntro}>Enter the 6-digit code sent to +91{form.mobile}</Text>
-              <Input label="OTP Code" value={otp} onChangeText={t => setOtp(t.replace(/\D/g, '').slice(0, 6))} keyboardType="number-pad" placeholder="123456" maxLength={6} containerStyle={styles.field} />
-              <Button
-                label="Verify & Continue"
-                onPress={handleVerify}
-                loading={loading}
-                icon={<ArrowRight size={18} color={Colors.white} />}
-                style={styles.ctaButton}
-              />
-              <TouchableOpacity onPress={timer === 0 ? handleRegister : undefined} disabled={timer > 0} activeOpacity={0.7}>
-                <Text style={[styles.resend, timer > 0 && styles.resendDisabled]}>
-                  {timer > 0 ? `Resend in ${timer}s` : 'Resend OTP'}
-                </Text>
-              </TouchableOpacity>
-            </>
-          )}
+            </View>
+          </View>
+          <Input label="Password *" value={form.password} onChangeText={t => update('password', t)} secureTextEntry placeholder="••••••••" containerStyle={styles.field} />
+          <Input label="Address" value={form.address} onChangeText={t => update('address', t)} multiline placeholder="Enter your full address..." containerStyle={styles.field} />
+          <Button
+            label="Create Account & Start Shopping"
+            onPress={handleRegister}
+            loading={loading}
+            icon={<ArrowRight size={18} color={Colors.white} />}
+            style={styles.ctaButton}
+          />
+          <Text style={styles.disclaimer}>By continuing, you agree to our Terms of Service and Privacy Policy.</Text>
         </View>
 
-        {step === 'form' && (
-          <TouchableOpacity onPress={() => navigation.navigate('VendorLogin', { role: 'retailer' })} activeOpacity={0.7}>
-            <Text style={styles.signInText}>Already registered? Sign In</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity onPress={() => navigation.navigate('VendorLogin', { role: 'retailer' })} activeOpacity={0.7}>
+          <Text style={styles.signInText}>Already registered? Sign In</Text>
+        </TouchableOpacity>
+
       </ScrollView>
     </SafeAreaView>
   );

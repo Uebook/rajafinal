@@ -27,7 +27,7 @@ const Users = () => {
 
   const handleEditCreditLimit = (user) => {
     setEditingUser(user);
-    const profile = user.retailer_profile || {};
+    const profile = user.vendor_profile || {};
     const limitInRupees = profile.credit_limit ? (profile.credit_limit / 100) : 0;
     setCreditLimitInput(String(limitInRupees));
     setShowEditModal(true);
@@ -45,10 +45,10 @@ const Users = () => {
 
     setSubmitting(true);
     try {
-      await api.patch(`/admin/retailers/${editingUser.id}/credit-limit`, {
+      await api.patch(`/admin/vendors/${editingUser.id}/credit-limit`, {
         credit_limit: limitNum
       });
-      alert('Credit limit updated successfully!');
+      alert('Vendor Credit limit updated successfully!');
       setShowEditModal(false);
       loadUsers();
     } catch (err) {
@@ -197,6 +197,7 @@ const Users = () => {
                   <th>Business Details</th>
                   <th>Contact Info</th>
                   <th>GSTIN / PAN</th>
+                  <th>Credit Limit</th>
                   <th>Location</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -207,7 +208,6 @@ const Users = () => {
                   <th>Owner Name</th>
                   <th>Contact Info</th>
                   <th>Type</th>
-                  <th>Credit Limit</th>
                   <th>Location</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -238,47 +238,13 @@ const Users = () => {
                           {vp.pan_number && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>PAN: {vp.pan_number}</span>}
                         </div>
                       </td>
+                      <td style={{ fontWeight: 600, color: 'var(--success)' }}>
+                        INR {((vp.credit_limit || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                           <span>{vp.city || 'N/A'}, {vp.state || 'N/A'}</span>
                           {vp.address && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }} title={vp.address}>{vp.address}</span>}
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`badge ${u.status}`}>{u.status}</span>
-                      </td>
-                      <td>
-                        <button 
-                          className={`btn btn-sm ${u.status === 'active' ? 'btn-danger' : 'btn-success'}`} 
-                          onClick={() => toggleStatus(u.id, u.status)}
-                        >
-                          {u.status === 'active' ? 'Block' : 'Activate'}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                } else {
-                  const rp = u.retailer_profile || {};
-                  return (
-                    <tr key={u.id}>
-                      <td>
-                        <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{rp.business_name || 'N/A'}</span>
-                      </td>
-                      <td style={{ fontWeight: 600 }}>{rp.owner_name || u.full_name}</td>
-                      <td>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span>{u.mobile}</span>
-                          {u.email && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{u.email}</span>}
-                        </div>
-                      </td>
-                      <td>{rp.business_type || 'N/A'}</td>
-                      <td style={{ fontWeight: 600, color: 'var(--success)' }}>
-                        INR {((rp.credit_limit || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span>{rp.city || 'N/A'}, {rp.state || 'N/A'}</span>
-                          {rp.address && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }} title={rp.address}>{rp.address}</span>}
                         </div>
                       </td>
                       <td>
@@ -303,6 +269,42 @@ const Users = () => {
                         </div>
                       </td>
                     </tr>
+                  );
+                } else {
+                  const rp = u.retailer_profile || {};
+                  return (
+                    <tr key={u.id}>
+                      <td>
+                        <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{rp.business_name || 'N/A'}</span>
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{rp.owner_name || u.full_name}</td>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span>{u.mobile}</span>
+                          {u.email && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{u.email}</span>}
+                        </div>
+                      </td>
+                      <td>{rp.business_type || 'N/A'}</td>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span>{rp.city || 'N/A'}, {rp.state || 'N/A'}</span>
+                          {rp.address && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }} title={rp.address}>{rp.address}</span>}
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`badge ${u.status}`}>{u.status}</span>
+                      </td>
+                      <td>
+                        <button 
+                          className={`btn btn-sm ${u.status === 'active' ? 'btn-danger' : 'btn-success'}`} 
+                          onClick={() => toggleStatus(u.id, u.status)}
+                          style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                        >
+                          {u.status === 'active' ? 'Block' : 'Activate'}
+                        </button>
+                      </td>
+                    </tr>
+
                   );
                 }
               })}

@@ -5,7 +5,7 @@ import { AuditService } from '../services/audit.service.js';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { orders, orderItems, ledgerEntries, retailers, products, users, carts, cartItems, discountCodes, retailerPricing } from '../db/schema.js';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, gte, lte, desc } from 'drizzle-orm';
 import crypto from 'crypto';
 import { AppError } from '../utils/errors.js';
 
@@ -15,7 +15,9 @@ const auditService = new AuditService();
 
 // Validation schema for status update
 const orderStatusUpdateSchema = z.object({
-  status: z.enum(['confirmed', 'dispatched', 'delivered', 'cancelled']),
+  status: z.string().transform((val) => val.toLowerCase()).pipe(
+    z.enum(['pending', 'confirmed', 'dispatched', 'delivered', 'cancelled', 'returned'])
+  ),
 });
 
 // Zod schemas for pagination and queries
@@ -272,6 +274,25 @@ router.get('/orders', getCurrentUser as any, async (req: AuthenticatedRequest, r
   }
 });
 
+// ── GET Single Order Details by ID ────────────────────────────
+router.get('/orders/:id', getCurrentUser as any, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const orderDetails = await orderService.getOrderById(req.params.id);
+    return res.status(200).json(orderDetails);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/admin/orders/:id', getCurrentUser as any, requireAdmin as any, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const orderDetails = await orderService.getOrderById(req.params.id);
+    return res.status(200).json(orderDetails);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ── P3-11: Update Order Status (Admin) ────────────────────────
 router.patch('/admin/orders/:id/status', getCurrentUser as any, requireAdmin as any, async (req: AuthenticatedRequest, res, next) => {
   try {
@@ -287,10 +308,23 @@ router.patch('/admin/orders/:id/status', getCurrentUser as any, requireAdmin as 
       { status }
     );
 
+    const calcSubtotal = order.subtotal || 0;
+    const calcGst = order.gstAmount || 0;
+    const calcDiscount = order.discountAmount || 0;
+    const calcGrandTotal = order.grandTotal ?? Math.max(0, calcSubtotal + calcGst - calcDiscount);
+
     return res.status(200).json({
       id: order.id,
       order_number: order.orderNumber,
+      orderNumber: order.orderNumber,
       status: order.status.toLowerCase(),
+      subtotal: calcSubtotal,
+      gst_amount: calcGst,
+      gstAmount: calcGst,
+      discount_amount: calcDiscount,
+      discountAmount: calcDiscount,
+      grand_total: calcGrandTotal,
+      grandTotal: calcGrandTotal,
     });
   } catch (error) {
     next(error);
@@ -299,19 +333,30 @@ router.patch('/admin/orders/:id/status', getCurrentUser as any, requireAdmin as 
 
 const adminOrderCreateSchema = z.object({
   retailerId: z.string(), // uuid or 'unregistered'
-  deliveryAddress: z.string().min(1, 'Delivery address is required'),
+  deliveryAddress: z.string().optional().default(''),
   items: z.array(z.object({
     productId: z.string().uuid('Invalid product ID'),
     quantity: z.number().positive('Quantity must be greater than 0'),
-    unitPrice: z.number().int().positive('Price must be greater than 0').optional(), // price in paise
+    unitPrice: z.number().nonnegative('Price must be non-negative').optional(), // price in paise
     unit: z.string().optional(),
   })).min(1, 'At least one item is required'),
-  discountAmount: z.number().int().nonnegative().optional(), // discount in paise
+  discountAmount: z.number().nonnegative().optional(), // discount in paise
+  deliveryCharge: z.number().nonnegative().optional().default(0), // delivery charge in paise
   unregisteredCustomer: z.object({
     name: z.string().min(1, 'Name is required'),
-    mobile: z.string().min(1, 'Mobile number is required'),
-    address: z.string().min(1, 'Address is required'),
+    mobile: z.string().optional(),
+    address: z.string().optional(),
   }).optional(),
+  // Payment info
+  paymentMethod: z.string().optional(),
+  paymentAmount: z.number().nonnegative().optional(), // amount received in paise
+  paymentRef: z.string().optional(), // UPI txn ID / account number
+  // Split payments array (optional)
+  payments: z.array(z.object({
+    method: z.string(),
+    amount: z.number().nonnegative(),
+    reference: z.string().optional(),
+  })).optional(),
 });
 
 const orderDiscountUpdateSchema = z.object({
@@ -321,7 +366,18 @@ const orderDiscountUpdateSchema = z.object({
 // ── Place Order on Behalf of Customer (Admin) ─────────────────
 router.post('/admin/orders', getCurrentUser as any, requireAdmin as any, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { retailerId: inputRetailerId, deliveryAddress, items, discountAmount = 0, unregisteredCustomer } = adminOrderCreateSchema.parse(req.body);
+    const {
+      retailerId: inputRetailerId,
+      deliveryAddress,
+      items,
+      discountAmount = 0,
+      deliveryCharge = 0,
+      unregisteredCustomer,
+      paymentMethod,
+      paymentAmount = 0,
+      paymentRef,
+      payments,
+    } = adminOrderCreateSchema.parse(req.body);
 
     let retailerId = inputRetailerId;
     let customerName = '';
@@ -331,26 +387,33 @@ router.post('/admin/orders', getCurrentUser as any, requireAdmin as any, async (
         throw new AppError(400, 'Unregistered customer details are required', 'BAD_REQUEST');
       }
 
-      // Check if user already exists with this mobile number
-      const [existingUser] = await db
-        .select()
-        .from(users)
-        .where(and(eq(users.mobile, unregisteredCustomer.mobile), eq(users.isDeleted, false)));
+      // Check if user already exists with this mobile number (only if mobile provided)
+      if (unregisteredCustomer.mobile) {
+        const [existingUser] = await db
+          .select()
+          .from(users)
+          .where(and(eq(users.mobile, unregisteredCustomer.mobile), eq(users.isDeleted, false)));
 
-      if (existingUser) {
-        retailerId = existingUser.id;
-        customerName = existingUser.fullName;
-      } else {
-        // Create new user & retailer profile on the fly
+        if (existingUser) {
+          retailerId = existingUser.id;
+          customerName = existingUser.fullName;
+        }
+      }
+
+      if (retailerId === 'unregistered') {
+        // Create new guest user — mobile optional
         const newUserId = crypto.randomUUID();
         const randomPassword = crypto.randomBytes(16).toString('hex');
-        
+        const guestMobile = unregisteredCustomer.mobile || `GUEST-${newUserId.slice(0, 8)}`;
+        const guestEmail = `guest_${newUserId.replace(/-/g, '')}@supplysetu.app`;
+
         await db
           .insert(users)
           .values({
             id: newUserId,
             fullName: unregisteredCustomer.name,
-            mobile: unregisteredCustomer.mobile,
+            mobile: guestMobile,
+            email: guestEmail,
             role: 'RETAILER',
             passwordHash: randomPassword,
           } as any);
@@ -362,7 +425,7 @@ router.post('/admin/orders', getCurrentUser as any, requireAdmin as any, async (
             userId: newUserId,
             businessName: unregisteredCustomer.name,
             ownerName: unregisteredCustomer.name,
-            address: unregisteredCustomer.address,
+            address: unregisteredCustomer.address || '',
           } as any);
 
         retailerId = newUserId;
@@ -415,7 +478,7 @@ router.post('/admin/orders', getCurrentUser as any, requireAdmin as any, async (
           unitPrice = rp ? rp.price : product.basePrice;
         }
 
-        const lineTotal = unitPrice * item.quantity;
+        const lineTotal = Math.round(unitPrice * item.quantity);
         const gstAmount = Math.round(lineTotal * product.gstRate / 100);
 
         orderItemsData.push({
@@ -423,7 +486,7 @@ router.post('/admin/orders', getCurrentUser as any, requireAdmin as any, async (
           productId: product.id,
           productName: product.name,
           quantity: item.quantity,
-          unitPrice: unitPrice,
+          unitPrice: Math.round(unitPrice),
           gstRate: product.gstRate,
           lineTotal: lineTotal,
           gstAmount: gstAmount,
@@ -434,8 +497,40 @@ router.post('/admin/orders', getCurrentUser as any, requireAdmin as any, async (
         totalGst += gstAmount;
       }
 
-      const grandTotal = Math.max(0, subtotal + totalGst - discountAmount);
+      const grandTotal = Math.max(0, subtotal + totalGst - Math.round(discountAmount) + Math.round(deliveryCharge));
       const orderId = crypto.randomUUID();
+
+      // Normalize payment details (supporting split payments array)
+      const paymentListToProcess: Array<{ method: string; amount: number; reference?: string }> = [];
+      if (payments && Array.isArray(payments) && payments.length > 0) {
+        for (const p of payments) {
+          if (p.method !== 'credit' && p.amount > 0) {
+            paymentListToProcess.push({
+              method: p.method,
+              amount: Math.round(p.amount),
+              reference: p.reference,
+            });
+          }
+        }
+      } else if (paymentMethod && paymentMethod !== 'credit' && paymentAmount && paymentAmount > 0) {
+        paymentListToProcess.push({
+          method: paymentMethod,
+          amount: Math.round(paymentAmount),
+          reference: paymentRef,
+        });
+      }
+
+      const totalPaidPaise = paymentListToProcess.reduce((sum, p) => sum + p.amount, 0);
+      const combinedMethod = paymentListToProcess.length === 1
+        ? paymentListToProcess[0].method
+        : paymentListToProcess.length > 1
+        ? paymentListToProcess.map(p => p.method).join(', ')
+        : (paymentMethod || null);
+      
+      const combinedRef = paymentListToProcess
+        .filter(p => p.reference)
+        .map(p => `${p.method.toUpperCase()}: ${p.reference}`)
+        .join(' | ') || (paymentRef || null);
 
       const [insertedOrder] = await tx
         .insert(orders)
@@ -443,12 +538,16 @@ router.post('/admin/orders', getCurrentUser as any, requireAdmin as any, async (
           id: orderId,
           userId: retailerId,
           orderNumber: orderNumber,
-          subtotal: subtotal,
-          gstAmount: totalGst,
-          discountAmount: discountAmount,
-          grandTotal: grandTotal,
-          deliveryAddress: deliveryAddress,
+          subtotal: Math.round(subtotal),
+          gstAmount: Math.round(totalGst),
+          discountAmount: Math.round(discountAmount),
+          grandTotal: Math.round(grandTotal),
+          deliveryAddress: deliveryAddress || '',
           status: 'CONFIRMED',
+          // Payment fields
+          paymentMethod: combinedMethod,
+          paymentAmount: totalPaidPaise,
+          paymentRef: combinedRef,
         } as any)
         .returning();
 
@@ -459,18 +558,39 @@ router.post('/admin/orders', getCurrentUser as any, requireAdmin as any, async (
         } as any);
       }
 
+      // Debit ledger entry — full order amount
       await tx.insert(ledgerEntries).values({
         id: crypto.randomUUID(),
         userId: retailerId,
         entryType: 'DEBIT',
-        amount: grandTotal,
+        amount: Math.round(grandTotal),
         referenceType: 'order',
         referenceId: orderId,
         description: `Order ${orderNumber} placed by Admin`,
         voucherType: 'SALES',
-        debitAccount: `Retailer: ${customerName}`,
+        debitAccount: `Retailer: ${customerName}`.substring(0, 100),
         creditAccount: 'Sales Account',
       } as any);
+
+      // Credit ledger entry for each payment method received
+      for (const p of paymentListToProcess) {
+        const methodLabel = p.method === 'cash' ? 'Cash'
+          : p.method === 'upi' ? `UPI${p.reference ? ` (${p.reference})` : ''}`
+          : `Account${p.reference ? ` (${p.reference})` : ''}`;
+
+        await tx.insert(ledgerEntries).values({
+          id: crypto.randomUUID(),
+          userId: retailerId,
+          entryType: 'CREDIT',
+          amount: p.amount,
+          referenceType: 'order',
+          referenceId: orderId,
+          description: `Payment received via ${methodLabel} for Order ${orderNumber}`,
+          voucherType: 'RECEIPT',
+          debitAccount: p.method === 'cash' ? 'Cash Account' : p.method === 'upi' ? 'UPI Account' : 'Bank Account',
+          creditAccount: `Retailer: ${customerName}`.substring(0, 100),
+        } as any);
+      }
 
       return insertedOrder;
     });
@@ -484,7 +604,27 @@ router.post('/admin/orders', getCurrentUser as any, requireAdmin as any, async (
       { retailerId, orderNumber }
     );
 
-    return res.status(201).json(result);
+    const calcSubtotal = result.subtotal || 0;
+    const calcGst = result.gstAmount || 0;
+    const calcDiscount = result.discountAmount || 0;
+    const calcGrandTotal = result.grandTotal ?? Math.max(0, calcSubtotal + calcGst - calcDiscount);
+
+    return res.status(201).json({
+      ...result,
+      id: result.id,
+      order_number: result.orderNumber,
+      orderNumber: result.orderNumber,
+      status: result.status.toLowerCase(),
+      subtotal: calcSubtotal,
+      gst_amount: calcGst,
+      gstAmount: calcGst,
+      discount_amount: calcDiscount,
+      discountAmount: calcDiscount,
+      grand_total: calcGrandTotal,
+      grandTotal: calcGrandTotal,
+      delivery_address: result.deliveryAddress,
+      deliveryAddress: result.deliveryAddress,
+    });
   } catch (error) {
     console.error('Error in POST /admin/orders:', error);
     next(error);
@@ -543,7 +683,20 @@ router.patch('/admin/orders/:id/discount', getCurrentUser as any, requireAdmin a
       { oldDiscount: order.discountAmount, newDiscount: discountAmount, newGrandTotal }
     );
 
-    return res.status(200).json(result);
+    return res.status(200).json({
+      ...result,
+      id: result.id,
+      order_number: result.orderNumber,
+      orderNumber: result.orderNumber,
+      status: result.status.toLowerCase(),
+      subtotal: result.subtotal,
+      gst_amount: result.gstAmount,
+      gstAmount: result.gstAmount,
+      discount_amount: result.discountAmount,
+      discountAmount: result.discountAmount,
+      grand_total: result.grandTotal,
+      grandTotal: result.grandTotal,
+    });
   } catch (error) {
     console.error('Error in PATCH /admin/orders/:id/discount:', error);
     next(error);
@@ -568,6 +721,73 @@ router.get('/ledger', getCurrentUser as any, async (req: AuthenticatedRequest, r
       }
     );
     return res.status(200).json(ledgerData);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── Daily Collection Summary (Admin) ─────────────────────────
+router.get('/admin/orders/daily-collection', getCurrentUser as any, requireAdmin as any, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const dateFrom = req.query.date_from ? new Date(req.query.date_from as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const dateTo = req.query.date_to ? new Date(req.query.date_to as string) : new Date();
+
+    // Set dateTo to end of day
+    dateTo.setHours(23, 59, 59, 999);
+
+    const rows = await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.isDeleted, false),
+          gte(orders.createdAt, dateFrom),
+          lte(orders.createdAt, dateTo)
+        )
+      )
+      .orderBy(desc(orders.createdAt));
+
+    // Group by date
+    const dailyMap = new Map<string, {
+      date: string;
+      total_orders: number;
+      grand_total: number;
+      cash_amount: number; cash_count: number;
+      upi_amount: number;  upi_count: number;
+      account_amount: number; account_count: number;
+      credit_amount: number; credit_count: number;
+      unpaid_amount: number; unpaid_count: number;
+    }>();
+
+    for (const o of rows) {
+      const dateKey = new Date(o.createdAt).toISOString().slice(0, 10); // YYYY-MM-DD
+      if (!dailyMap.has(dateKey)) {
+        dailyMap.set(dateKey, {
+          date: dateKey,
+          total_orders: 0, grand_total: 0,
+          cash_amount: 0, cash_count: 0,
+          upi_amount: 0,  upi_count: 0,
+          account_amount: 0, account_count: 0,
+          credit_amount: 0, credit_count: 0,
+          unpaid_amount: 0, unpaid_count: 0,
+        });
+      }
+      const day = dailyMap.get(dateKey)!;
+      day.total_orders += 1;
+      day.grand_total += o.grandTotal;
+
+      const method = o.paymentMethod?.toLowerCase();
+      const paid = o.paymentAmount || 0;
+
+      if (method === 'cash')    { day.cash_amount += paid;    day.cash_count += 1; }
+      else if (method === 'upi')     { day.upi_amount += paid;     day.upi_count += 1; }
+      else if (method === 'account') { day.account_amount += paid; day.account_count += 1; }
+      else if (method === 'credit')  { day.credit_amount += o.grandTotal; day.credit_count += 1; }
+      else                           { day.unpaid_amount += o.grandTotal; day.unpaid_count += 1; }
+    }
+
+    const result = Array.from(dailyMap.values()).sort((a, b) => b.date.localeCompare(a.date));
+    return res.status(200).json(result);
   } catch (error) {
     next(error);
   }

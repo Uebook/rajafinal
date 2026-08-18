@@ -27,6 +27,7 @@ mobile/android/local.properties
 mobile/android/.gradle/
 mobile/android/app/build/
 mobile/android/.cxx/
+mobile/android/app/C*
 
 # Scratch files, uploads, and local log folders
 /brain/

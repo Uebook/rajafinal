@@ -173,43 +173,12 @@ const LedgerScreen: React.FC = () => {
               </Text>
             </View>
 
-            {/* available balance dark card */}
+            {/* Outstanding balance dark card */}
             <View style={styles.darkCard}>
-              <Text style={styles.darkCardLabel}>AVAILABLE BALANCE</Text>
-              <Text style={styles.darkCardAmount}>{formatRupeeDecimal(availableBalance)}</Text>
-
-              <View style={styles.utilizationRow}>
-                <Text style={styles.utilizationLabel}>Credit Limit Utilization</Text>
-                <Text style={styles.utilizationVal}>{utilizationPercent}% Exhausted</Text>
-              </View>
-
-              {/* Progress bar */}
-              <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: `${utilizationPercent}%` }]} />
-              </View>
-
-              <View style={styles.limitRow}>
-                <Text style={styles.limitText}>Limit: {formatRupee(creditLimit)}</Text>
-              </View>
+              <Text style={styles.darkCardLabel}>TOTAL OUTSTANDING BALANCE</Text>
+              <Text style={styles.darkCardAmount}>{formatRupeeDecimal(balance)}</Text>
             </View>
 
-            {/* Upcoming Dues Card */}
-            <View style={styles.whiteCard}>
-              <Text style={styles.cardLabel}>Upcoming Dues</Text>
-              <Text style={[styles.cardAmount, { color: balance > 0 ? Colors.error : Colors.success }]}>
-                {formatRupee(balance > 0 ? balance : 0)}
-              </Text>
-              <Text style={styles.cardSub}>
-                {balance > 0 ? dueText : 'No outstanding dues'}
-              </Text>
-            </View>
-
-            {/* Credit Cycle Card */}
-            <View style={styles.whiteCard}>
-              <Text style={styles.cardLabel}>Credit Cycle</Text>
-              <Text style={styles.cardCycle}>{cycleText}</Text>
-              <Text style={styles.cardSub}>Monthly settlement</Text>
-            </View>
 
             {/* Transaction History Heading & Export */}
             <View style={styles.sectionHeaderRow}>

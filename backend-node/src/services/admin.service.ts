@@ -78,7 +78,7 @@ export class AdminService {
         credits: sql<number>`COALESCE(SUM(CASE WHEN ${ledgerEntries.entryType} = 'CREDIT' THEN ${ledgerEntries.amount} ELSE 0 END), 0)`,
       })
       .from(ledgerEntries)
-      .innerJoin(users, eq(ledgerEntries.userId, users.id))
+      .innerJoin(users, sql`${ledgerEntries.userId}::text = ${users.id}::text`)
       .where(and(...debtConditions));
     const totalDebt = Number(debtRes?.debits || 0) - Number(debtRes?.credits || 0);
 

@@ -3,7 +3,7 @@ import { pgTable, pgEnum, varchar, index, foreignKey, uuid, jsonb, text, timesta
 
 export const discount_type_enum = pgEnum("discount_type_enum", ['FLAT', 'PERCENTAGE'])
 export const ledger_type_enum = pgEnum("ledger_type_enum", ['DEBIT', 'CREDIT'])
-export const order_status_enum = pgEnum("order_status_enum", ['PENDING', 'CONFIRMED', 'DISPATCHED', 'DELIVERED', 'CANCELLED'])
+export const order_status_enum = pgEnum("order_status_enum", ['PENDING', 'CONFIRMED', 'DISPATCHED', 'DELIVERED', 'CANCELLED', 'RETURNED'])
 export const payment_method_enum = pgEnum("payment_method_enum", ['ONLINE', 'CASH', 'CHEQUE', 'MANUAL'])
 export const payment_status_enum = pgEnum("payment_status_enum", ['INITIATED', 'SUCCESS', 'FAILED', 'REFUNDED'])
 export const product_status_enum = pgEnum("product_status_enum", ['ACTIVE', 'HIDDEN'])

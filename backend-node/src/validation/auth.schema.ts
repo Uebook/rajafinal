@@ -38,7 +38,9 @@ export const vendorCreateSchema = z.object({
 export const retailerRegisterSchema = z.object({
   mobile: z.string().min(10).max(15),
   owner_name: z.string().min(2).max(255),
-  business_name: z.string().min(2).max(255),
+  business_name: z.string().optional().nullable(),
+  email: z.string().email().optional().nullable().or(z.literal('')),
+  password: z.string().optional().nullable(),
   business_type: z.string().optional().nullable(),
   gst_number: z.string().optional().nullable(),
   address: z.string().optional().nullable(),

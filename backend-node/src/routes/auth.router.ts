@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { users, vendors, retailers, ledgerEntries } from '../db/schema.js';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { AuthService } from '../services/auth.service.js';
 import { OTPService } from '../services/otp.service.js';
 import { AuditService } from '../services/audit.service.js';
@@ -110,7 +110,7 @@ router.get('/admin/vendors', getCurrentUser as any, requireAdmin as any, async (
         vendor: vendors,
       })
       .from(users)
-      .leftJoin(vendors, eq(users.id, vendors.userId))
+      .leftJoin(vendors, sql`${users.id}::text = ${vendors.userId}::text`)
       .where(and(eq(users.role, 'VENDOR'), eq(users.isDeleted, false)));
 
     const formatted = results.map(({ user, vendor }) => {
@@ -146,7 +146,7 @@ router.get('/admin/retailers', getCurrentUser as any, requireAdmin as any, async
         retailer: retailers,
       })
       .from(users)
-      .leftJoin(retailers, eq(users.id, retailers.userId))
+      .leftJoin(retailers, sql`${users.id}::text = ${retailers.userId}::text`)
       .where(and(eq(users.role, 'RETAILER'), eq(users.isDeleted, false)));
 
     // Fetch all active ledger entries to aggregate in memory
@@ -292,13 +292,17 @@ router.post('/vendor/auth/otp/verify', async (req, res, next) => {
   }
 });
 
-// ── P2-06: Retailer Self-Registration ───────────────────────
 router.post('/retailer/auth/register', async (req, res, next) => {
   try {
     const data = retailerRegisterSchema.parse(req.body);
     const user = await authService.registerRetailer(data);
-    await otpService.sendOtp(data.mobile, 'register');
-    return res.status(201).json(formatUserResponse(user));
+    const tokens = await authService.generateTokens(user);
+    return res.status(201).json({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      token_type: tokens.token_type,
+      user: formatUserResponse(user),
+    });
   } catch (error) {
     next(error);
   }
@@ -434,6 +438,26 @@ router.patch('/admin/retailers/:retailer_id/status', getCurrentUser as any, requ
 
 const creditLimitUpdateSchema = z.object({
   credit_limit: z.number().nonnegative('Credit limit must be a positive number or zero'),
+});
+
+router.patch('/admin/vendors/:vendor_id/credit-limit', getCurrentUser as any, requireAdmin as any, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { vendor_id } = req.params;
+    const { credit_limit } = creditLimitUpdateSchema.parse(req.body);
+    const limitInPaise = Math.round(credit_limit * 100);
+    const updatedVendor = await authService.updateVendorCreditLimit(vendor_id, limitInPaise);
+    await auditService.logAction(
+      req.user!.id,
+      req.user!.role,
+      'update_vendor_credit_limit',
+      'vendor',
+      vendor_id,
+      { credit_limit: limitInPaise }
+    );
+    return res.status(200).json({ success: true, vendor: updatedVendor });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.patch('/admin/retailers/:retailer_id/credit-limit', getCurrentUser as any, requireAdmin as any, async (req: AuthenticatedRequest, res, next) => {

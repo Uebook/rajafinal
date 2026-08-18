@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Search, X, FileText, ChevronLeft, ChevronRight, Calendar, Filter, Plus } from 'lucide-react';
+import { Search, X, FileText, ChevronLeft, ChevronRight, Calendar, Filter, Plus, Printer } from 'lucide-react';
+import { InvoiceModal } from './Invoices';
 
 const statusOptions = ['pending', 'confirmed', 'dispatched', 'delivered', 'cancelled', 'returned'];
 
@@ -220,6 +221,15 @@ const Orders = () => {
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [invoiceOrder, setInvoiceOrder] = useState(null);
+  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'collection'
+
+  // Daily collection state
+  const [collection, setCollection] = useState([]);
+  const [collLoading, setCollLoading] = useState(false);
+  const [collFrom, setCollFrom] = useState('');
+  const [collTo, setCollTo] = useState('');
+  const [collMethodFilter, setCollMethodFilter] = useState(''); // '' | 'cash' | 'upi' | 'account' | 'credit'
 
   // New states for creating order on behalf
   const [showCreateOrderModal, setShowCreateOrderModal] = useState(false);
@@ -244,17 +254,32 @@ const Orders = () => {
   const [unregMobile, setUnregMobile] = useState('');
   const [unregAddress, setUnregAddress] = useState('');
 
+  // Payment states (split / multiple payment methods)
+  const [splitPayments, setSplitPayments] = useState({
+    cashAmount: '',
+    upiAmount: '',
+    upiRef: '',
+    accountAmount: '',
+    accountRef: ''
+  });
 
 
   const load = async () => {
     try {
       setLoading(true);
-      const params = { page, page_size: 20 };
+      const params = { page, page_size: 50 };
       if (statusFilter) params.order_status = statusFilter;
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo) params.date_to = dateTo;
       const { data } = await api.get('/orders', { params });
-      setOrders(data);
+      const rawList = Array.isArray(data) ? data : [];
+      const totalCount = rawList.length;
+      const formattedList = rawList.map((o, index) => ({
+        ...o,
+        short_invoice_no: `Supp ${totalCount - index}`,
+        seq_no: totalCount - index
+      }));
+      setOrders(formattedList);
     } catch (err) {
       console.error(err);
     } finally {
@@ -271,7 +296,14 @@ const Orders = () => {
         api.get('/products', { params: { page_size: 1000 } })
       ]);
       setRetailersList(retRes.data || []);
-      setProductsList(prodRes.data || []);
+      
+      const rawProd = prodRes.data;
+      const prods = Array.isArray(rawProd)
+        ? rawProd
+        : (rawProd?.products || rawProd?.data || rawProd?.items || rawProd?.list || []);
+      
+      console.log('Loaded products count:', prods.length, prods);
+      setProductsList(prods);
     } catch (err) {
       console.error('Error loading metadata:', err);
     }
@@ -323,7 +355,9 @@ const Orders = () => {
     if (field === 'productId') {
       const prod = productsList.find(p => p.id === value);
       if (prod) {
-        newItems[index].unitPrice = (prod.basePrice / 100).toFixed(2);
+        // API returns snake_case: base_price, stock_qty, unit
+        const price = prod.base_price ?? prod.basePrice ?? 0;
+        newItems[index].unitPrice = (price / 100).toFixed(2);
         newItems[index].unit = prod.unit || 'pcs';
         if (prod.unit === 'kg / gm') {
           const q = Number(newItems[index].quantity || 1);
@@ -353,8 +387,8 @@ const Orders = () => {
   const handleCreateOrderBehalfSubmit = async (e) => {
     e.preventDefault();
     if (!createOrderForm.retailerId) return alert('Please select a customer (retailer)');
-    if (createOrderForm.retailerId === 'unregistered' && (!unregName || !unregMobile || !unregAddress)) {
-      return alert('Please fill in unregistered customer details');
+    if (createOrderForm.retailerId === 'unregistered' && !unregName.trim()) {
+      return alert('Customer Name is required for unregistered customers.');
     }
     if (createOrderForm.items.some(i => !i.productId || i.quantity <= 0)) {
       return alert('Please select valid products and quantities');
@@ -373,19 +407,34 @@ const Orders = () => {
         return payloadItem;
       });
 
+      const cashPaise = Math.round(Number(splitPayments.cashAmount || 0) * 100);
+      const upiPaise = Math.round(Number(splitPayments.upiAmount || 0) * 100);
+      const accountPaise = Math.round(Number(splitPayments.accountAmount || 0) * 100);
+
+      const paymentsPayload = [];
+      if (cashPaise > 0) paymentsPayload.push({ method: 'cash', amount: cashPaise });
+      if (upiPaise > 0) paymentsPayload.push({ method: 'upi', amount: upiPaise, ...(splitPayments.upiRef ? { reference: splitPayments.upiRef } : {}) });
+      if (accountPaise > 0) paymentsPayload.push({ method: 'account', amount: accountPaise, ...(splitPayments.accountRef ? { reference: splitPayments.accountRef } : {}) });
+
+      const totalPaidPaise = cashPaise + upiPaise + accountPaise;
+      const primaryMethod = paymentsPayload.length === 1 ? paymentsPayload[0].method : paymentsPayload.length > 1 ? 'split' : 'credit';
+
       const payload = {
         retailerId: createOrderForm.retailerId,
         deliveryAddress: createOrderForm.deliveryAddress,
         items: itemsPayload,
         discountAmount: Math.round(Number(createOrderForm.discountAmount || 0) * 100),
-        deliveryCharge: createOrderForm.applyDeliveryCharge ? Math.round(Number(createOrderForm.deliveryChargeAmount || 0) * 100) : 0
+        deliveryCharge: createOrderForm.applyDeliveryCharge ? Math.round(Number(createOrderForm.deliveryChargeAmount || 0) * 100) : 0,
+        paymentMethod: primaryMethod,
+        paymentAmount: totalPaidPaise,
+        ...(paymentsPayload.length > 0 ? { payments: paymentsPayload } : {}),
       };
 
       if (createOrderForm.retailerId === 'unregistered') {
         payload.unregisteredCustomer = {
           name: unregName,
-          mobile: unregMobile,
-          address: unregAddress
+          ...(unregMobile ? { mobile: unregMobile } : {}),
+          ...(unregAddress ? { address: unregAddress } : {})
         };
       }
 
@@ -403,6 +452,13 @@ const Orders = () => {
       setUnregName('');
       setUnregMobile('');
       setUnregAddress('');
+      setSplitPayments({
+        cashAmount: '',
+        upiAmount: '',
+        upiRef: '',
+        accountAmount: '',
+        accountRef: ''
+      });
       load();
     } catch (err) {
       alert(err.response?.data?.message || err.response?.data?.detail || 'Failed to create order');
@@ -506,11 +562,54 @@ const Orders = () => {
 
   const hasFilters = statusFilter || dateFrom || dateTo || searchQuery;
 
+  // Load daily collection
+  const loadCollection = async () => {
+    try {
+      setCollLoading(true);
+      const params = {};
+      if (collFrom) params.date_from = collFrom;
+      if (collTo) params.date_to = collTo;
+      const { data } = await api.get('/admin/orders/daily-collection', { params });
+      setCollection(data || []);
+    } catch (err) {
+      console.error('Daily collection error:', err);
+    } finally {
+      setCollLoading(false);
+    }
+  };
+
+  useEffect(() => { if (activeTab === 'collection') loadCollection(); }, [activeTab, collFrom, collTo]);
+
+  // Payment method badge helper
+  const payBadge = (method, amount) => {
+    if (!method) return <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>—</span>;
+    const cfg = {
+      cash:    { label: '💵 Cash',    bg: '#dcfce7', color: '#16a34a' },
+      upi:     { label: '📱 UPI',     bg: '#ede9fe', color: '#7c3aed' },
+      account: { label: '🏦 Account', bg: '#dbeafe', color: '#2563eb' },
+      credit:   { label: '📒 Credit',  bg: '#fee2e2', color: '#dc2626' },
+    };
+    const c = cfg[method] || { label: method, bg: '#f3f4f6', color: '#6b7280' };
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 10, fontSize: '0.7rem', fontWeight: 700, background: c.bg, color: c.color }}>
+          {c.label}
+        </span>
+        {amount > 0 && method !== 'credit' && <span style={{ fontSize: '0.7rem', color: c.color, fontWeight: 600 }}>{fmt(amount)}</span>}
+      </div>
+    );
+  };
+
   // Client-side search filter
   const filteredOrders = orders.filter(o => {
     if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
+    const cleanQ = q.replace(/\s+/g, '');
+    const invNo = (o.short_invoice_no || '').toLowerCase();
+    const invNoClean = invNo.replace(/\s+/g, '');
     return (
+      invNo.includes(q) ||
+      invNoClean.includes(cleanQ) ||
       o.order_number?.toLowerCase().includes(q) ||
       o.buyer_name?.toLowerCase().includes(q) ||
       o.buyer_mobile?.includes(q) ||
@@ -527,14 +626,37 @@ const Orders = () => {
           <button className="btn btn-primary" onClick={() => setShowCreateOrderModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Plus size={16} /> Create Order (Behalf)
           </button>
-          <button className="btn btn-secondary" onClick={handleExportGeneral}>
-            Export CSV
-          </button>
-          <button className="btn btn-secondary" onClick={handleExportTally}>
-            Export Tally CSV
-          </button>
+          <button className="btn btn-secondary" onClick={handleExportGeneral}>Export CSV</button>
+          <button className="btn btn-secondary" onClick={handleExportTally}>Export Tally CSV</button>
         </div>
       </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--border-color)', marginBottom: 0 }}>
+        {[{ id: 'orders', label: '📋 Orders' }, { id: 'collection', label: '💰 Daily Collection' }].map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: '10px 24px',
+              border: 'none',
+              borderBottom: activeTab === tab.id ? '2px solid var(--primary)' : '2px solid transparent',
+              marginBottom: -2,
+              background: 'none',
+              color: activeTab === tab.id ? 'var(--primary)' : 'var(--text-muted)',
+              fontWeight: activeTab === tab.id ? 700 : 500,
+              fontSize: '0.88rem',
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'orders' && (<>
 
       {/* Filters */}
       <div className="table-container" style={{ marginBottom: 0, borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0', borderBottom: 'none' }}>
@@ -606,6 +728,7 @@ const Orders = () => {
                 <th>Order #</th>
                 <th>Buyer</th>
                 <th>Status</th>
+                <th>Payment</th>
                 <th style={{ textAlign: 'right' }}>Items</th>
                 <th style={{ textAlign: 'right' }}>Subtotal</th>
                 <th style={{ textAlign: 'right' }}>GST</th>
@@ -646,6 +769,7 @@ const Orders = () => {
                       {o.status}
                     </span>
                   </td>
+                  <td>{payBadge(o.payment_method, o.payment_amount)}</td>
                   <td style={{ textAlign: 'right' }}>{o.items?.length || 0}</td>
                   <td style={{ textAlign: 'right' }}>{fmt(o.subtotal)}</td>
                   <td style={{ textAlign: 'right' }}>{fmt(o.gst_amount)}</td>
@@ -661,6 +785,13 @@ const Orders = () => {
                         onClick={() => setSelectedOrder(o)}
                       >
                         <FileText size={11} /> Details
+                      </button>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        style={{ fontSize: '0.72rem', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 3 }}
+                        onClick={() => setInvoiceOrder(o)}
+                      >
+                        <Printer size={11} /> Invoice
                       </button>
                       <button
                         className="btn btn-secondary btn-sm"
@@ -689,7 +820,7 @@ const Orders = () => {
               ))}
               {filteredOrders.length === 0 && (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                  <td colSpan="10" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                     <Filter size={32} style={{ display: 'block', margin: '0 auto 10px', opacity: 0.4 }} />
                     No orders found for the selected filters
                   </td>
@@ -715,6 +846,207 @@ const Orders = () => {
           Next <ChevronRight size={14} />
         </button>
       </div>
+      </>)}
+
+      {/* ── Daily Collection Tab ─────────────────────────────── */}
+      {activeTab === 'collection' && (
+        <div style={{ marginTop: 16 }}>
+          {/* Date filters */}
+          <div className="table-container" style={{ marginBottom: 0, borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0', borderBottom: 'none' }}>
+            <div className="table-toolbar" style={{ gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Calendar size={14} style={{ color: 'var(--text-muted)' }} />
+                <input type="date" className="form-input" style={{ marginBottom: 0, fontSize: '0.82rem', height: 36, width: 140 }}
+                  value={collFrom} onChange={e => setCollFrom(e.target.value)} />
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>to</span>
+                <input type="date" className="form-input" style={{ marginBottom: 0, fontSize: '0.82rem', height: 36, width: 140 }}
+                  value={collTo} onChange={e => setCollTo(e.target.value)} />
+                {(collFrom || collTo) && (
+                  <button className="btn btn-secondary btn-sm" onClick={() => { setCollFrom(''); setCollTo(''); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <X size={12} /> Clear
+                  </button>
+                )}
+              </div>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                {collection.length} day{collection.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+
+          {/* Summary Cards */}
+          {!collLoading && collection.length > 0 && (() => {
+            const totals = {
+              cash:    { amount: collection.reduce((a, d) => a + d.cash_amount,    0), count: collection.reduce((a, d) => a + d.cash_count,    0) },
+              upi:     { amount: collection.reduce((a, d) => a + d.upi_amount,     0), count: collection.reduce((a, d) => a + d.upi_count,     0) },
+              account: { amount: collection.reduce((a, d) => a + d.account_amount, 0), count: collection.reduce((a, d) => a + d.account_count, 0) },
+              credit:  { amount: collection.reduce((a, d) => a + d.credit_amount,  0), count: collection.reduce((a, d) => a + d.credit_count,  0) },
+            };
+            const cards = [
+              { key: 'cash',    emoji: '💵', label: 'Cash',    color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', darkColor: '#15803d' },
+              { key: 'upi',     emoji: '📱', label: 'UPI',     color: '#7c3aed', bg: '#faf5ff', border: '#ddd6fe', darkColor: '#6d28d9' },
+              { key: 'account', emoji: '🏦', label: 'Account', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', darkColor: '#1d4ed8' },
+              { key: 'credit',  emoji: '📒', label: 'Credit',  color: '#dc2626', bg: '#fff1f2', border: '#fecdd3', darkColor: '#b91c1c' },
+            ];
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 16 }}>
+                {cards.map(card => {
+                  const t = totals[card.key];
+                  const active = collMethodFilter === card.key;
+                  return (
+                    <div
+                      key={card.key}
+                      onClick={() => setCollMethodFilter(active ? '' : card.key)}
+                      style={{
+                        background: active ? card.bg : 'var(--bg-primary)',
+                        border: `2px solid ${active ? card.color : 'var(--border-color)'}`,
+                        borderRadius: 'var(--radius-lg)',
+                        padding: '16px 18px',
+                        cursor: 'pointer',
+                        transition: 'all 0.18s ease',
+                        boxShadow: active ? `0 4px 16px ${card.color}25` : '0 1px 4px rgba(0,0,0,0.06)',
+                        transform: active ? 'translateY(-2px)' : 'none',
+                        userSelect: 'none',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                        <span style={{ fontSize: '1.6rem', lineHeight: 1 }}>{card.emoji}</span>
+                        {active && (
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: card.color, background: `${card.color}15`, padding: '2px 7px', borderRadius: 10, letterSpacing: '0.04em' }}>FILTERED</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: active ? card.color : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                        {card.label}
+                      </div>
+                      <div style={{ fontSize: '1.35rem', fontWeight: 800, color: active ? card.darkColor : 'var(--text-primary)', lineHeight: 1.1 }}>
+                        {fmt(t.amount)}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                        {t.count} order{t.count !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          {/* Collection Table */}
+          <div className="table-container" style={{ borderRadius: 'var(--radius-lg)' }}>
+            {collLoading ? (
+              <div className="loading-center" style={{ padding: '3rem 0' }}><div className="spinner" /></div>
+            ) : (
+              <>
+              {/* Method filter active banner */}
+              {collMethodFilter && (() => {
+                const cfg = {
+                  cash:    { emoji: '💵', label: 'Cash',    color: '#16a34a' },
+                  upi:     { emoji: '📱', label: 'UPI',     color: '#7c3aed' },
+                  account: { emoji: '🏦', label: 'Account', color: '#2563eb' },
+                  credit:  { emoji: '📒', label: 'Credit',  color: '#dc2626' },
+                };
+                const c = cfg[collMethodFilter];
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: `${c.color}10`, borderBottom: `2px solid ${c.color}30` }}>
+                    <span style={{ fontSize: '1rem' }}>{c.emoji}</span>
+                    <span style={{ fontWeight: 700, color: c.color, fontSize: '0.85rem' }}>Showing {c.label} orders only</span>
+                    <button onClick={() => setCollMethodFilter('')} style={{ marginLeft: 'auto', background: 'none', border: `1px solid ${c.color}50`, borderRadius: 6, padding: '2px 10px', color: c.color, cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}>
+                      ✕ Clear Filter
+                    </button>
+                  </div>
+                );
+              })()}
+              <div className="table-responsive">
+                <table className="custom-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th style={{ textAlign: 'right' }}>Orders</th>
+                      <th style={{ textAlign: 'right' }}>Grand Total</th>
+                      <th style={{ textAlign: 'right', color: '#16a34a', background: collMethodFilter === 'cash'    ? '#f0fdf4' : undefined }}>💵 Cash</th>
+                      <th style={{ textAlign: 'right', color: '#7c3aed', background: collMethodFilter === 'upi'     ? '#faf5ff' : undefined }}>📱 UPI</th>
+                      <th style={{ textAlign: 'right', color: '#2563eb', background: collMethodFilter === 'account' ? '#eff6ff' : undefined }}>🏦 Account</th>
+                      <th style={{ textAlign: 'right', color: '#dc2626', background: collMethodFilter === 'credit'  ? '#fff1f2' : undefined }}>📒 Credit</th>
+                      <th style={{ textAlign: 'right', color: '#6b7280' }}>Unpaid</th>
+                      <th style={{ textAlign: 'right', color: '#0ea5e9' }}>Collected</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      // Filter rows: keep a day only if it has activity in the selected method
+                      const visibleDays = collMethodFilter
+                        ? collection.filter(d => {
+                            if (collMethodFilter === 'cash')    return d.cash_count > 0;
+                            if (collMethodFilter === 'upi')     return d.upi_count > 0;
+                            if (collMethodFilter === 'account') return d.account_count > 0;
+                            if (collMethodFilter === 'credit')  return d.credit_count > 0;
+                            return true;
+                          })
+                        : collection;
+
+                      if (visibleDays.length === 0) return (
+                        <tr>
+                          <td colSpan="9" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                            <Filter size={32} style={{ display: 'block', margin: '0 auto 10px', opacity: 0.4 }} />
+                            No {collMethodFilter || ''} orders found for the selected date range
+                          </td>
+                        </tr>
+                      );
+
+                      const colBg = (key) => collMethodFilter === key ? { background: { cash: '#f0fdf420', upi: '#faf5ff20', account: '#eff6ff20', credit: '#fff1f220' }[key] } : {};
+
+                      return (<>
+                        {visibleDays.map(day => {
+                          const collected = day.cash_amount + day.upi_amount + day.account_amount;
+                          return (
+                            <tr key={day.date} style={collMethodFilter ? { opacity: 1 } : {}}>
+                              <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                {new Date(day.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                              </td>
+                              <td style={{ textAlign: 'right', fontWeight: 600 }}>{day.total_orders}</td>
+                              <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(day.grand_total)}</td>
+                              <td style={{ textAlign: 'right', color: '#16a34a', fontWeight: collMethodFilter === 'cash' ? 800 : 600, ...colBg('cash') }}>
+                                {day.cash_count > 0 ? <>{fmt(day.cash_amount)}<br /><span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{day.cash_count} orders</span></> : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                              </td>
+                              <td style={{ textAlign: 'right', color: '#7c3aed', fontWeight: collMethodFilter === 'upi' ? 800 : 600, ...colBg('upi') }}>
+                                {day.upi_count > 0 ? <>{fmt(day.upi_amount)}<br /><span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{day.upi_count} orders</span></> : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                              </td>
+                              <td style={{ textAlign: 'right', color: '#2563eb', fontWeight: collMethodFilter === 'account' ? 800 : 600, ...colBg('account') }}>
+                                {day.account_count > 0 ? <>{fmt(day.account_amount)}<br /><span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{day.account_count} orders</span></> : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                              </td>
+                              <td style={{ textAlign: 'right', color: '#dc2626', fontWeight: collMethodFilter === 'credit' ? 800 : 600, ...colBg('credit') }}>
+                                {day.credit_count > 0 ? <>{fmt(day.credit_amount)}<br /><span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{day.credit_count} orders</span></> : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                              </td>
+                              <td style={{ textAlign: 'right', color: '#6b7280', fontWeight: 600 }}>
+                                {day.unpaid_count > 0 ? <>{fmt(day.unpaid_amount)}<br /><span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{day.unpaid_count} orders</span></> : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                              </td>
+                              <td style={{ textAlign: 'right', fontWeight: 800, color: '#0ea5e9', fontSize: '0.95rem' }}>
+                                {fmt(collected)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        <tr style={{ background: 'var(--bg-secondary)', fontWeight: 800, borderTop: '2px solid var(--border-color)' }}>
+                          <td>TOTAL ({visibleDays.length} days)</td>
+                          <td style={{ textAlign: 'right' }}>{visibleDays.reduce((a, d) => a + d.total_orders, 0)}</td>
+                          <td style={{ textAlign: 'right' }}>{fmt(visibleDays.reduce((a, d) => a + d.grand_total, 0))}</td>
+                          <td style={{ textAlign: 'right', color: '#16a34a' }}>{fmt(visibleDays.reduce((a, d) => a + d.cash_amount, 0))}</td>
+                          <td style={{ textAlign: 'right', color: '#7c3aed' }}>{fmt(visibleDays.reduce((a, d) => a + d.upi_amount, 0))}</td>
+                          <td style={{ textAlign: 'right', color: '#2563eb' }}>{fmt(visibleDays.reduce((a, d) => a + d.account_amount, 0))}</td>
+                          <td style={{ textAlign: 'right', color: '#dc2626' }}>{fmt(visibleDays.reduce((a, d) => a + d.credit_amount, 0))}</td>
+                          <td style={{ textAlign: 'right', color: '#6b7280' }}>{fmt(visibleDays.reduce((a, d) => a + d.unpaid_amount, 0))}</td>
+                          <td style={{ textAlign: 'right', color: '#0ea5e9' }}>{fmt(visibleDays.reduce((a, d) => a + d.cash_amount + d.upi_amount + d.account_amount, 0))}</td>
+                        </tr>
+                      </>);
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Order Detail Modal */}
       {selectedOrder && (
@@ -771,7 +1103,7 @@ const Orders = () => {
                     marginTop: -4
                   }}>
                     <div className="form-group">
-                      <label className="form-label">Customer Name *</label>
+                      <label className="form-label">Customer Name <span style={{ color: 'var(--danger)' }}>*</span></label>
                       <input
                         type="text"
                         required
@@ -782,10 +1114,9 @@ const Orders = () => {
                       />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Mobile Number *</label>
+                      <label className="form-label">Mobile Number <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
                       <input
                         type="tel"
-                        required
                         className="form-input"
                         placeholder="Enter mobile..."
                         value={unregMobile}
@@ -793,10 +1124,9 @@ const Orders = () => {
                       />
                     </div>
                     <div className="form-group" style={{ gridColumn: 'span 2', marginBottom: 0 }}>
-                      <label className="form-label">Customer Address *</label>
+                      <label className="form-label">Customer Address <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
                       <input
                         type="text"
-                        required
                         className="form-input"
                         placeholder="Enter full address..."
                         value={unregAddress}
@@ -811,10 +1141,14 @@ const Orders = () => {
 
                 {/* Delivery Address */}
                 <div className="form-group">
-                  <label className="form-label">Delivery Address *</label>
+                  <label className="form-label">
+                    Delivery Address
+                    {createOrderForm.retailerId !== 'unregistered' && <span style={{ color: 'var(--danger)' }}> *</span>}
+                    {createOrderForm.retailerId === 'unregistered' && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}> (optional)</span>}
+                  </label>
                   <textarea
                     className="form-input"
-                    required
+                    required={createOrderForm.retailerId !== 'unregistered'}
                     rows={2}
                     placeholder="Enter full shipping address..."
                     value={createOrderForm.deliveryAddress}
@@ -854,11 +1188,16 @@ const Orders = () => {
                               onChange={e => handleCreateOrderItemChange(idx, 'productId', e.target.value)}
                             >
                               <option value="">-- Select Product --</option>
-                              {productsList.map(p => (
-                                <option key={p.id} value={p.id}>
-                                  {p.name} (Stock: {p.stockQty} {p.unit})
-                                </option>
-                              ))}
+                              {productsList.map(p => {
+                                const name = p.name || p.title || p.product_name || `Product ${p.id}`;
+                                const stock = p.stock_qty ?? p.stockQty ?? p.stock ?? 0;
+                                const unit = p.unit || 'pcs';
+                                return (
+                                  <option key={p.id || name} value={p.id}>
+                                    {name} (Stock: {stock} {unit})
+                                  </option>
+                                );
+                              })}
                             </select>
                           </td>
                           <td>
@@ -954,12 +1293,12 @@ const Orders = () => {
                 {/* Custom Discount & Delivery Charges */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div className="form-group">
-                    <label className="form-label">Custom Discount (₹)</label>
+                    <label className="form-label" style={{ fontWeight: 600 }}>Custom Discount (₹)</label>
                     <input
                       type="number"
                       step="0.01"
                       min="0"
-                      placeholder="0.00"
+                      placeholder="Enter discount in ₹ (e.g. 50)"
                       className="form-input"
                       value={createOrderForm.discountAmount || ''}
                       onChange={e => setCreateOrderForm({ ...createOrderForm, discountAmount: e.target.value })}
@@ -989,6 +1328,165 @@ const Orders = () => {
                       onChange={e => setCreateOrderForm({ ...createOrderForm, deliveryChargeAmount: e.target.value })}
                     />
                   </div>
+                </div>
+
+                {/* ── Multiple Payment Methods (Split Payment) Section ───────────────────────── */}
+                <div style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '14px 16px',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Payment Collection (Split / Multiple Methods)
+                    </div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+                      Grand Total: <span style={{ color: 'var(--primary)', fontSize: '0.95rem' }}>₹{((createOrderForm.items.reduce((acc, item) => acc + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0) + (createOrderForm.applyDeliveryCharge ? Number(createOrderForm.deliveryChargeAmount || 0) : 0) - Number(createOrderForm.discountAmount || 0))).toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* Preset Quick Buttons */}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const total = (createOrderForm.items.reduce((acc, item) => acc + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0) + (createOrderForm.applyDeliveryCharge ? Number(createOrderForm.deliveryChargeAmount || 0) : 0) - Number(createOrderForm.discountAmount || 0)).toFixed(2);
+                        setSplitPayments({ cashAmount: total, upiAmount: '', upiRef: '', accountAmount: '', accountRef: '' });
+                      }}
+                      style={{ padding: '6px 14px', borderRadius: 16, border: '1px solid #16a34a', background: '#16a34a15', color: '#16a34a', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}
+                    >
+                      💵 Full Cash
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const total = (createOrderForm.items.reduce((acc, item) => acc + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0) + (createOrderForm.applyDeliveryCharge ? Number(createOrderForm.deliveryChargeAmount || 0) : 0) - Number(createOrderForm.discountAmount || 0)).toFixed(2);
+                        setSplitPayments({ cashAmount: '', upiAmount: total, upiRef: splitPayments.upiRef, accountAmount: '', accountRef: '' });
+                      }}
+                      style={{ padding: '6px 14px', borderRadius: 16, border: '1px solid #7c3aed', background: '#7c3aed15', color: '#7c3aed', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}
+                    >
+                      📱 Full UPI
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const total = (createOrderForm.items.reduce((acc, item) => acc + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0) + (createOrderForm.applyDeliveryCharge ? Number(createOrderForm.deliveryChargeAmount || 0) : 0) - Number(createOrderForm.discountAmount || 0)).toFixed(2);
+                        setSplitPayments({ cashAmount: '', upiAmount: '', upiRef: '', accountAmount: total, accountRef: splitPayments.accountRef });
+                      }}
+                      style={{ padding: '6px 14px', borderRadius: 16, border: '1px solid #2563eb', background: '#2563eb15', color: '#2563eb', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}
+                    >
+                      🏦 Full Bank
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSplitPayments({ cashAmount: '', upiAmount: '', upiRef: '', accountAmount: '', accountRef: '' })}
+                      style={{ padding: '6px 14px', borderRadius: 16, border: '1px solid #dc2626', background: '#dc262615', color: '#dc2626', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer' }}
+                    >
+                      📒 Full Udhar / Credit
+                    </button>
+                  </div>
+
+                  {/* Inputs for split amounts */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                    {/* Cash */}
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">💵 Cash Received (₹)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        className="form-input"
+                        style={{ marginBottom: 0 }}
+                        value={splitPayments.cashAmount}
+                        onChange={e => setSplitPayments(prev => ({ ...prev, cashAmount: e.target.value }))}
+                      />
+                    </div>
+                    <div></div>
+
+                    {/* UPI */}
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">📱 UPI Received (₹)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        className="form-input"
+                        style={{ marginBottom: 0 }}
+                        value={splitPayments.upiAmount}
+                        onChange={e => setSplitPayments(prev => ({ ...prev, upiAmount: e.target.value }))}
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">UPI Txn ID <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>(optional)</span></label>
+                      <input
+                        type="text"
+                        placeholder="e.g. UPI987654321"
+                        className="form-input"
+                        style={{ marginBottom: 0 }}
+                        value={splitPayments.upiRef}
+                        onChange={e => setSplitPayments(prev => ({ ...prev, upiRef: e.target.value }))}
+                      />
+                    </div>
+
+                    {/* Account */}
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">🏦 Bank / Account (₹)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        className="form-input"
+                        style={{ marginBottom: 0 }}
+                        value={splitPayments.accountAmount}
+                        onChange={e => setSplitPayments(prev => ({ ...prev, accountAmount: e.target.value }))}
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Account / Txn Ref <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>(optional)</span></label>
+                      <input
+                        type="text"
+                        placeholder="e.g. A/C 0012345678"
+                        className="form-input"
+                        style={{ marginBottom: 0 }}
+                        value={splitPayments.accountRef}
+                        onChange={e => setSplitPayments(prev => ({ ...prev, accountRef: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Live Payment Summary Card */}
+                  {(() => {
+                    const gt = (createOrderForm.items.reduce((acc, item) => acc + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0) + (createOrderForm.applyDeliveryCharge ? Number(createOrderForm.deliveryChargeAmount || 0) : 0) - Number(createOrderForm.discountAmount || 0));
+                    const totalPaid = Number(splitPayments.cashAmount || 0) + Number(splitPayments.upiAmount || 0) + Number(splitPayments.accountAmount || 0);
+                    const remaining = Math.max(0, gt - totalPaid);
+                    return (
+                      <div style={{
+                        padding: '10px 14px',
+                        borderRadius: 8,
+                        background: 'var(--bg-primary)',
+                        border: '1px solid var(--border-color)',
+                        fontSize: '0.83rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 4
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
+                          <span>Total Amount Paid:</span>
+                          <span style={{ color: '#16a34a' }}>₹{totalPaid.toFixed(2)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
+                          <span>Remaining Balance (Udhar / Credit):</span>
+                          <span style={{ color: remaining > 0 ? '#dc2626' : '#16a34a' }}>
+                            ₹{remaining.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
               </div>
@@ -1038,6 +1536,11 @@ const Orders = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Invoice Modal */}
+      {invoiceOrder && (
+        <InvoiceModal order={invoiceOrder} onClose={() => setInvoiceOrder(null)} />
       )}
     </div>
   );

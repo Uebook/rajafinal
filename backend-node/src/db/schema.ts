@@ -4,7 +4,7 @@ import { pgTable, pgEnum, varchar, index, foreignKey, uuid, jsonb, text, timesta
 
 export const discount_type_enum = pgEnum("discount_type_enum", ['FLAT', 'PERCENTAGE'])
 export const ledger_type_enum = pgEnum("ledger_type_enum", ['DEBIT', 'CREDIT'])
-export const order_status_enum = pgEnum("order_status_enum", ['PENDING', 'CONFIRMED', 'DISPATCHED', 'DELIVERED', 'CANCELLED'])
+export const order_status_enum = pgEnum("order_status_enum", ['PENDING', 'CONFIRMED', 'DISPATCHED', 'DELIVERED', 'CANCELLED', 'RETURNED'])
 export const payment_method_enum = pgEnum("payment_method_enum", ['ONLINE', 'CASH', 'CHEQUE', 'MANUAL'])
 export const payment_status_enum = pgEnum("payment_status_enum", ['INITIATED', 'SUCCESS', 'FAILED', 'REFUNDED'])
 export const product_status_enum = pgEnum("product_status_enum", ['ACTIVE', 'HIDDEN'])
@@ -249,6 +249,7 @@ export const vendors = pgTable("vendors", {
 	city: varchar("city", { length: 100 }),
 	state: varchar("state", { length: 100 }),
 	pincode: varchar("pincode", { length: 10 }),
+	creditLimit: integer("credit_limit").default(0).notNull(),
 	id: uuid("id").primaryKey().$defaultFn(() => crypto.randomUUID()).notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -479,7 +480,7 @@ export const users = pgTable("users", {
 	status: user_status_enum("status").default('ACTIVE').notNull(),
 	isVerified: boolean("is_verified").default(false).notNull(),
 	geoLocation: jsonb("geo_location"),
-	id: uuid("id").primaryKey().$defaultFn(() => crypto.randomUUID()).notNull(),
+	id: varchar("id", { length: 255 }).primaryKey().$defaultFn(() => crypto.randomUUID()).notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 	isDeleted: boolean("is_deleted").default(false).notNull(),
@@ -581,6 +582,10 @@ export const orders = pgTable("orders", {
 	deletedAt: timestamp("deleted_at", { withTimezone: true }),
 	returnReason: text("return_reason"),
 	returnImageUrl: varchar("return_image_url"),
+	// Payment tracking columns
+	paymentMethod: varchar("payment_method", { length: 20 }), // cash | upi | account | udhar
+	paymentAmount: integer("payment_amount").default(0),      // amount received in paise
+	paymentRef: varchar("payment_ref", { length: 255 }),       // UPI ID / account number / note
 },
 (table) => {
 	return {

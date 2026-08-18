@@ -10,6 +10,7 @@ import discountRouter from './routes/discount.router.js';
 import cartRouter from './routes/cart.router.js';
 import paymentRouter from './routes/payment.router.js';
 import purchaseRouter from './routes/purchase.router.js';
+import accountingRouter from './routes/accounting.router.js';
 import { errorHandler } from './middleware/error.js';
 import { db } from './db/index.js';
 import { sql } from 'drizzle-orm';
@@ -80,6 +81,7 @@ app.use(apiPrefix, discountRouter);
 app.use(apiPrefix, cartRouter);
 app.use(apiPrefix, paymentRouter);
 app.use(apiPrefix, purchaseRouter);
+app.use(apiPrefix + '/admin', accountingRouter);
 
 // ── 404 Not Found Fallback ──────────────────────────────────
 app.use((req, res, next) => {

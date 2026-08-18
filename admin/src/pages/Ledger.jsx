@@ -131,8 +131,8 @@ const Ledger = () => {
       setLedgerEntries(data.entries || []);
       setLedgerSummary({
         outstanding_balance: data.outstanding_balance || 0,
-        credit_limit: data.credit_limit || retailerUser.retailer_profile?.credit_limit || 0,
-        available_balance: data.available_balance || 0,
+        credit_limit: 0,
+        available_balance: 0,
       });
     } catch (err) {
       alert('Failed to load retailer ledger entries');
@@ -150,10 +150,12 @@ const Ledger = () => {
       setSelectedSupplier(supplier);
       const { data } = await api.get(`/admin/suppliers/${supplier.id}/ledger`);
       setLedgerEntries(data.entries || []);
+      const limit = data.credit_limit || supplier.vendor_profile?.credit_limit || 0;
+      const outstanding = data.outstanding_balance || 0;
       setLedgerSummary({
-        outstanding_balance: data.outstanding_balance || 0,
-        credit_limit: 0,
-        available_balance: 0,
+        outstanding_balance: outstanding,
+        credit_limit: limit,
+        available_balance: Math.max(0, limit - outstanding),
       });
     } catch (err) {
       alert('Failed to load supplier ledger entries');
@@ -162,6 +164,7 @@ const Ledger = () => {
       setLoading(false);
     }
   };
+
 
   const handleSelectRetailer = (retailerUser) => {
     setSelectedSupplier(null);
@@ -401,7 +404,7 @@ const Ledger = () => {
             </div>
             
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              {!isSupplier && (
+              {isSupplier && (
                 <div className="kpi-card" style={{ padding: '14px 20px', minWidth: 160, '--card-color': 'var(--primary)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Credit Limit</span>
                   <span style={{ fontSize: '1.25rem', fontWeight: 700, display: 'block', marginTop: 4 }}>
@@ -412,14 +415,14 @@ const Ledger = () => {
 
               <div className="kpi-card" style={{ padding: '14px 20px', minWidth: 160, '--card-color': ledgerSummary.outstanding_balance > 0 ? 'var(--danger)' : 'var(--text-primary)' }}>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  {isSupplier ? 'Payable Outstanding' : 'Used (Outstanding)'}
+                  {isSupplier ? 'Payable Outstanding' : 'Outstanding Balance'}
                 </span>
                 <span style={{ fontSize: '1.25rem', fontWeight: 700, display: 'block', marginTop: 4, color: ledgerSummary.outstanding_balance > 0 ? 'var(--danger)' : 'inherit' }}>
                   {fmt(ledgerSummary.outstanding_balance)}
                 </span>
               </div>
 
-              {!isSupplier && (
+              {isSupplier && (
                 <div className="kpi-card" style={{ padding: '14px 20px', minWidth: 160, '--card-color': 'var(--success)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Available Credit</span>
                   <span style={{ fontSize: '1.25rem', fontWeight: 700, display: 'block', marginTop: 4, color: 'var(--success)' }}>
@@ -428,6 +431,7 @@ const Ledger = () => {
                 </div>
               )}
             </div>
+
           </div>
         </div>
 
@@ -904,7 +908,15 @@ const Ledger = () => {
                   <select
                     className="form-select"
                     value={voucherForm.partyType}
-                    onChange={e => setVoucherForm({ ...voucherForm, partyType: e.target.value, partyId: '' })}
+                    onChange={e => {
+                      const newParty = e.target.value;
+                      setVoucherForm({ 
+                        ...voucherForm, 
+                        partyType: newParty, 
+                        partyId: '',
+                        voucherType: newParty === 'RETAILER' ? 'PAYMENT_RECEIVE' : 'SUPPLIER_PAYMENT' 
+                      });
+                    }}
                     required
                   >
                     <option value="RETAILER">Customer (Retailer)</option>
@@ -936,17 +948,29 @@ const Ledger = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Voucher Type *</label>
+                  <label className="form-label">Voucher Action Type *</label>
                   <select
                     className="form-select"
                     value={voucherForm.voucherType}
                     onChange={e => setVoucherForm({ ...voucherForm, voucherType: e.target.value })}
                     required
                   >
-                    <option value="PAYMENT">Payment Voucher (Money Paid)</option>
-                    <option value="RECEIPT">Receipt Voucher (Money Received)</option>
-                    <option value="DEBIT_NOTE">Debit Note Voucher</option>
-                    <option value="CREDIT_NOTE">Credit Note Voucher</option>
+                    {voucherForm.partyType === 'RETAILER' ? (
+                      <>
+                        <option value="PAYMENT_RECEIVE">Payment Receive (Money Received from Customer)</option>
+                        <option value="CREDIT_NOTE_CUSTOMER">Credit Note (Customer Return / Discount Credit)</option>
+                        <option value="CUSTOMER_DUE_ENTRY">Customer Due Amount Entry (Record Outstanding Balance)</option>
+                        <option value="CUSTOMER_DUE_PAID">Customer Due Amount Paid Entry (Past Due Settlement)</option>
+                        <option value="DEBIT_NOTE">Debit Note (Charge / Interest Debit)</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="SUPPLIER_PAYMENT">Supplier Payment (Payment Paid to Supplier)</option>
+                        <option value="DEBIT_NOTE_SUPPLIER">Debit Note Supplier (Purchase Return / Debit Claim)</option>
+                        <option value="SUPPLIER_DUE_ENTRY">Supplier Due Amount Entry (Record Opening Payable)</option>
+                        <option value="CREDIT_NOTE">Credit Note (Supplier Extra Credit)</option>
+                      </>
+                    )}
                   </select>
                 </div>
 

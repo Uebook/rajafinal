@@ -68,16 +68,27 @@ export class OrderService {
       const buyer = buyerUsers.find((u) => u.id === o.userId);
       const retailer = buyerRetailers.find((r) => r.userId === o.userId);
 
+      const calcSubtotal = o.subtotal || 0;
+      const calcGst = o.gstAmount || 0;
+      const calcDiscount = o.discountAmount || 0;
+      const calcGrandTotal = o.grandTotal ?? Math.max(0, calcSubtotal + calcGst - calcDiscount);
+
       return {
         id: o.id,
         order_number: o.orderNumber,
+        orderNumber: o.orderNumber,
         status: o.status.toLowerCase(),
-        subtotal: o.subtotal,
-        gst_amount: o.gstAmount,
-        discount_amount: o.discountAmount,
-        grand_total: o.grandTotal,
+        subtotal: calcSubtotal,
+        gst_amount: calcGst,
+        gstAmount: calcGst,
+        discount_amount: calcDiscount,
+        discountAmount: calcDiscount,
+        grand_total: calcGrandTotal,
+        grandTotal: calcGrandTotal,
         delivery_address: o.deliveryAddress,
+        deliveryAddress: o.deliveryAddress,
         created_at: o.createdAt,
+        createdAt: o.createdAt,
         items: oItems,
         return_image_url: o.returnImageUrl || null,
         return_reason: o.returnReason || null,
@@ -85,8 +96,86 @@ export class OrderService {
         buyer_name: retailer?.ownerName || buyer?.fullName || null,
         buyer_mobile: buyer?.mobile || null,
         buyer_business: retailer?.businessName || null,
+        // Payment details
+        payment_method: o.paymentMethod || null,
+        payment_amount: o.paymentAmount || 0,
+        payment_ref: o.paymentRef || null,
       };
     });
+  }
+
+  // ── Get Single Order Details by ID ────────────────────────────
+
+  async getOrderById(orderId: string) {
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(and(eq(orders.id, orderId), eq(orders.isDeleted, false)));
+
+    if (!order) {
+      throw new AppError(404, 'Order not found', 'NOT_FOUND');
+    }
+
+    const items = await db
+      .select()
+      .from(orderItems)
+      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.isDeleted, false)));
+
+    const [buyer] = await db
+      .select({ id: users.id, fullName: users.fullName, mobile: users.mobile })
+      .from(users)
+      .where(eq(users.id, order.userId));
+
+    const [retailer] = await db
+      .select({ businessName: retailers.businessName, ownerName: retailers.ownerName })
+      .from(retailers)
+      .where(eq(retailers.userId, order.userId));
+
+    const calcSubtotal = order.subtotal || 0;
+    const calcGst = order.gstAmount || 0;
+    const calcDiscount = order.discountAmount || 0;
+    const calcGrandTotal = order.grandTotal ?? Math.max(0, calcSubtotal + calcGst - calcDiscount);
+
+    return {
+      id: order.id,
+      order_number: order.orderNumber,
+      orderNumber: order.orderNumber,
+      status: order.status.toLowerCase(),
+      subtotal: calcSubtotal,
+      gst_amount: calcGst,
+      gstAmount: calcGst,
+      discount_amount: calcDiscount,
+      discountAmount: calcDiscount,
+      grand_total: calcGrandTotal,
+      grandTotal: calcGrandTotal,
+      delivery_address: order.deliveryAddress,
+      deliveryAddress: order.deliveryAddress,
+      created_at: order.createdAt,
+      createdAt: order.createdAt,
+      items: items.map((i) => ({
+        id: i.id,
+        product_id: i.productId,
+        productId: i.productId,
+        product_name: i.productName,
+        productName: i.productName,
+        quantity: i.quantity,
+        unit_price: i.unitPrice,
+        unitPrice: i.unitPrice,
+        gst_rate: i.gstRate,
+        gstRate: i.gstRate,
+        line_total: i.lineTotal,
+        lineTotal: i.lineTotal,
+        gst_amount: i.gstAmount,
+        gstAmount: i.gstAmount,
+        unit: i.unit || 'pcs',
+      })),
+      buyer_name: retailer?.ownerName || buyer?.fullName || null,
+      buyer_mobile: buyer?.mobile || null,
+      buyer_business: retailer?.businessName || null,
+      payment_method: order.paymentMethod || null,
+      payment_amount: order.paymentAmount || 0,
+      payment_ref: order.paymentRef || null,
+    };
   }
 
 
@@ -106,8 +195,8 @@ export class OrderService {
     const statusUpper = newStatus.toUpperCase();
 
     return db.transaction(async (tx) => {
-      // 1. Release stock if order cancelled
-      if (statusUpper === 'CANCELLED' && oldStatus !== 'CANCELLED') {
+      // 1. Release stock if order cancelled or returned
+      if ((statusUpper === 'CANCELLED' || statusUpper === 'RETURNED') && oldStatus !== 'CANCELLED' && oldStatus !== 'RETURNED') {
         const items = await tx
           .select()
           .from(orderItems)

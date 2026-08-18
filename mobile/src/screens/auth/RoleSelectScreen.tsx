@@ -69,7 +69,7 @@ const RoleSelectScreen: React.FC<Props> = ({ navigation }) => {
             <Store size={26} color={Colors.textPrimary} />
           </View>
           <Text style={[styles.cardTitle, selectedRole === 'retailer' && styles.textActive]}>
-            I'm a Retailer
+            I'm a Customer
           </Text>
           <Text style={styles.cardDesc}>{t('retailerLongDesc')}</Text>
 
